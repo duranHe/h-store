@@ -718,6 +718,7 @@ public final class HStoreConf {
                 enumOptions="org.voltdb.types.AntiCacheDBType"
         )
         public String anticache_dbtype;
+        
         @ConfigProperty(
             description="Enable the anti-cache timestamps feature. This requires that the system " +
             		    "is compiled with ${site.anticache_enable} set to true.",
@@ -733,6 +734,13 @@ public final class HStoreConf {
             experimental=true
         )
         public boolean anticache_timestamps_prime;
+
+        @ConfigProperty(
+            description="Defines whether HStore uses VerticalPartitioning or not",
+            defaultBoolean=false,
+            experimental=true
+        )
+        public boolean anticache_vertical_partitioning;
         
         // ----------------------------------------------------------------------------
         // Storage MMAP Options

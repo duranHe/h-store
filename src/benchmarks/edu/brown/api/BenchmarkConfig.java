@@ -105,6 +105,8 @@ public class BenchmarkConfig {
     public String deferrable[];
 	public String batchEvictable[];
 	
+	public String evictColumn[];
+	
     public boolean dumpDatabase;
     public String dumpDatabaseDir;
     
@@ -227,6 +229,7 @@ public class BenchmarkConfig {
             boolean markovRecomputeAfterWarmup,
             String evictable[],
             String batchEvictable[],
+            String evictColumn[],
             String deferrable[],
             boolean dumpDatabase,
             String dumpDatabaseDir
@@ -292,6 +295,7 @@ public class BenchmarkConfig {
         
         this.evictable = evictable;
         this.batchEvictable = batchEvictable;
+        this.evictColumn = evictColumn;
         this.deferrable = deferrable;
         
         this.dumpDatabase = dumpDatabase;

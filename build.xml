@@ -889,6 +889,7 @@ NATIVE EE STUFF
         <arg value="ANTICACHE_NVM=${site.anticache_nvm}" />
         <arg value="ANTICACHE_TIMESTAMPS=${site.anticache_timestamps}" />
         <arg value="ANTICACHE_TIMESTAMPS_PRIME=${site.anticache_timestamps_prime}" />
+    	<arg value="ANTICACHE_VERTICAL_PARTITIONING=${site.anticache_vertical_partitioning}" />
         <arg value="${build}" />
     </exec>
 </target>
@@ -1737,7 +1738,7 @@ TEST CASES
         <arg value="CATALOG=${catalog}" />
         <arg value="DEFERRABLE=${deferrable}" />
         <arg value="EVICTABLE=${evictable}" />
-       <arg value="BATCHEVICTABLE=${batchevictable}" /> 
+        <arg value="BATCHEVICTABLE=${batchevictable}" /> 
         <arg value="partitionplan=${partitionplan}" />
         <arg value="partitionplan.nosecondary=${partitionplan.nosecondary}" />
         <arg value="partitionplan.ignore_missing=${partitionplan.ignore_missing}" />

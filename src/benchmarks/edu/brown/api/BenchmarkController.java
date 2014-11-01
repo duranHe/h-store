@@ -1785,6 +1785,8 @@ public class BenchmarkController {
         String evictable[] = null;
         // Batch Evictable Tables        
         String[] batchEvictable = null;
+        // Evicted Columns
+        String evictColumn[] = null;
         
         boolean dumpDatabase = false;
         String dumpDatabaseDir = null;
@@ -1970,7 +1972,13 @@ public class BenchmarkController {
                 LOG.info("BATCHEVICTABLE: " + parts[1]);
                 batchEvictable = parts[1].split(",");
             }
-                        
+            /*
+             * List of evictColumns
+             */
+            else if (parts[0].equalsIgnoreCase("EVICTCOLUMN")) {
+                LOG.info("EVICTCOLUMN: " + parts[1]);
+                evictColumn = parts[1].split(",");
+            }
             /*
              * List of deferrable queries
              * Format: <ProcedureName>.<StatementName>
@@ -2157,6 +2165,7 @@ public class BenchmarkController {
                 markov_recomputeAfterWarmup,
                 evictable,
                 batchEvictable,
+                evictColumn,
                 deferrable,
                 dumpDatabase,
                 dumpDatabaseDir

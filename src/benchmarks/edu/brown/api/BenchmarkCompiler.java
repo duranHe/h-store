@@ -72,6 +72,13 @@ public class BenchmarkCompiler {
                                                          tableName, m_projectBuilder.getProjectName())); 
             } // FOR
         }
+        if(m_config.evictColumn != null) {
+            for(String columnName : m_config.evictColumn) {
+                if (columnName.isEmpty()) continue;
+                m_projectBuilder.markTableEvictColumn(columnName);
+                LOG.info(String.format("Marking table ", args));
+            }
+        }
         
         boolean success = m_projectBuilder.compile(m_jarFileName.getAbsolutePath(),
                                                    m_config.sitesPerHost,
