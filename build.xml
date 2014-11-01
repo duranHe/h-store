@@ -1739,6 +1739,8 @@ TEST CASES
         <arg value="DEFERRABLE=${deferrable}" />
         <arg value="EVICTABLE=${evictable}" />
         <arg value="BATCHEVICTABLE=${batchevictable}" /> 
+    	<arg value="EVICTCOLUMN=${evictColumn}" />
+    	
         <arg value="partitionplan=${partitionplan}" />
         <arg value="partitionplan.nosecondary=${partitionplan.nosecondary}" />
         <arg value="partitionplan.ignore_missing=${partitionplan.ignore_missing}" />

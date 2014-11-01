@@ -222,6 +222,11 @@ public class VoltProjectBuilder {
     private final HashSet<String> m_batchEvictableTables = new HashSet<String>();
     
     /**
+     * Evictable Columns
+     */
+    private final HashSet<String> m_evictColumns = new HashSet<String>();
+    
+    /**
      * Prefetchable Queries
      * ProcedureName -> StatementName
      * @see Prefetchable
@@ -488,6 +493,18 @@ public class VoltProjectBuilder {
      */
     public void markTableBatchEvictable(String tableName) {
         m_batchEvictableTables.add(tableName);
+    }
+    
+    // -------------------------------------------------------------------
+    // Evictable columns
+    // -------------------------------------------------------------------
+     
+    /**
+     * Mark a column as evictable
+     * @param columnInfo Format is tableName:columnName
+     */
+    public void markColumnEvictable(String columnInfo) {
+        m_evictColumns.add(columnInfo);
     }
 
     // -------------------------------------------------------------------
@@ -1103,7 +1120,23 @@ public class VoltProjectBuilder {
                 table.setAttribute("table", tableName);
                 batchevictables.appendChild(table);
             }
-        }        
+        } 
+        
+        // column-wise vertical partitioning
+        if(m_evictColumns.isEmpty() == false) {
+            final Element evictColumns = doc.createElement("evictColumns");
+            database.appendChild(evictColumns);
+            
+            // Columns to be evicted
+            for(String columnInfo : m_evictColumns) {
+                String[] token = columnInfo.split(":");
+                final Element column = doc.createElement("evictColumn");
+                column.setAttribute("table", token[0]);
+                column.setAttribute("column", token[1]);
+                evictColumns.appendChild(column);
+            }
+        }
+        
         // Vertical Partitions
         if (m_replicatedSecondaryIndexes.size() > 0) {
             // /project/database/partitions

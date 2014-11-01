@@ -75,9 +75,10 @@ public class BenchmarkCompiler {
         if(m_config.evictColumn != null) {
             for(String columnName : m_config.evictColumn) {
                 if (columnName.isEmpty()) continue;
-                m_projectBuilder.markTableEvictColumn(columnName);
-                LOG.info(String.format("Marking table ", args));
-            }
+                m_projectBuilder.markColumnEvictable(columnName);
+                LOG.info(String.format("Marking column %s as evictable in %s", 
+                        columnName, m_projectBuilder.getProjectName()));
+            } // FOR
         }
         
         boolean success = m_projectBuilder.compile(m_jarFileName.getAbsolutePath(),
