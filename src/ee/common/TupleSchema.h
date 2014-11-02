@@ -72,6 +72,9 @@ public:
     
 
     static TupleSchema* createEvictedTupleSchema();
+    /** Static factory method to create a TupleSchema object with a fixed number of columns */
+    static TupleSchema* createEvictedTupleSchema(const std::vector<ValueType> columnTypes, const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull);
+
     
     /**
      * Static factory method to create a TupleSchema object for a ReadWriteTracker result

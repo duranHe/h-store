@@ -300,17 +300,22 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         if(true)
         {
 			const int numEvictColumns = static_cast<int>(catalogTable.evictColumns().size());
-			vector<ColumnType> evictColumnTypes(numEvictColumns);
+			vector<ValueType> evictColumnTypes(numEvictColumns);
 			vector<int32_t> evictColumnLengths(numEvictColumns);
 			vector<bool> evictColumnAllowNull(numEvictColumns);
-			string *evictColumnNames = new string[numEvictColumns];
+			string *evictColumnNames = new string[numEvictColumns + 2];
+
+			evictColumnNames[0] = std::string("BLOCK_ID");
+			evictColumnNames[1] = std::string("TUPLE_OFFSET");
 
 			map<string, catalog::ColumnRef*>::const_iterator evictColumnIte;
-			for(evictColumnIte = catalog.evictColumns().begin();
-				evictColumnIte != catalog.evictColumns().end(); evictColumnIte++)
+			for(evictColumnIte = catalogTable.evictColumns().begin();
+				evictColumnIte != catalogTable.evictColumns().end(); evictColumnIte++)
 			{
-				const catalog::ColumnRef *evict_column = evictColumnIte->second;
-				const int columnIndex = evict_column->index();
+				const catalog::ColumnRef *evict_columnRef = evictColumnIte->second;
+				const catalog::Column *evict_column = evict_columnRef->column();
+
+				const int columnIndex = evict_columnRef->index();
 				const ValueType type = static_cast<ValueType>(evict_column->type());
 				evictColumnTypes[columnIndex] = type;
 
@@ -320,11 +325,14 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 						static_cast<int32_t>(NValue::getTupleStorageSize(type));
 				evictColumnLengths[columnIndex] = length;
 				evictColumnAllowNull[columnIndex] = evict_column->nullable();
-				evictColumnNames[columnIndex] = evict_column->name();
+				evictColumnNames[columnIndex + 2] = evict_column->name();
 			}
 
 			TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema(evictColumnTypes,
 					evictColumnLengths, evictColumnAllowNull);
+			voltdb::Table *evicted_table = TableFactory::getEvictedTable(databaseId,
+					executorContext, evictedName, evictedSchema, evictColumnNames);
+			dynamic_cast<PersistentTable*>(m_table)->setEvictedTable(evicted_table);
         }
         else
         {

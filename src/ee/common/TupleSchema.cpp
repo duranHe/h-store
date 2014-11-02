@@ -144,6 +144,31 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
 
 TupleSchema* TupleSchema::createEvictedTupleSchema(const std::vector<ValueType> columnTypes,
 		const std::vector<int32_t> columnLengths, const std::vector<bool> allowNull){
+    const int evictColumnNum = colunTypes.size();
+	std::vector<ValueType> columnTypes(evictColumnNum + 2);
+    std::vector<int32_t> columnSizes(evictColumnNum + 2);
+    std::vector<bool> allowNull(evictColumnNum + 2);
+
+    // create a schema containing a single column for the block_id
+    columnTypes[0] = VALUE_TYPE_SMALLINT;
+    columnSizes[0] = static_cast<int32_t>(NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT));
+    allowNull[0] = false;
+
+    columnTypes[1] = VALUE_TYPE_INTEGER;
+    columnSizes[1] = static_cast<int32_t>(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    allowNull[1] = false;
+
+    // create a schema for columns that don't need to be evicted
+    // TO DO
+
+    TupleSchema *blockids_schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, false);
+
+    //TupleSchema *evicted_schema = TupleSchema::createTupleSchema(pkey_schema, blockids_schema);
+
+    // Always make sure that we return memory!
+    //TupleSchema::freeTupleSchema(blockids_schema);
+
+    return (blockids_schema);
 	return NULL;
 }
     
