@@ -141,6 +141,11 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
 
     return schema;
 }
+
+TupleSchema* TupleSchema::createEvictedTupleSchema(const std::vector<ValueType> columnTypes,
+		const std::vector<int32_t> columnLengths, const std::vector<bool> allowNull){
+	return NULL;
+}
     
 TupleSchema* TupleSchema::createEvictedTupleSchema() {
     std::vector<ValueType> columnTypes(2);

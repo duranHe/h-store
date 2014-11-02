@@ -293,26 +293,62 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         stream << catalogTable.name() << "__EVICTED";
         const std::string evictedName = stream.str();
         VOLT_INFO("Creating EvictionTable '%s'", evictedName.c_str());
-        TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema();
 
-        // Get the column names for the EvictedTable
-        string *evictedColumnNames = new string[evictedSchema->columnCount()];
-        evictedColumnNames[0] = std::string("BLOCK_ID");
-        evictedColumnNames[1] = std::string("TUPLE_OFFSET"); 
-        
-        // TODO: Should we construct a primary key index?
-        //       For now I'm going to skip that.
-    
-        voltdb::Table *evicted_table = TableFactory::getEvictedTable(
-                                                        databaseId, 
-                                                        executorContext,
-                                                        evictedName,
-                                                        evictedSchema, 
-                                                        evictedColumnNames);
-        // We'll shove the EvictedTable to the PersistentTable
-        // It will be responsible for deleting it in its deconstructor
-        dynamic_cast<PersistentTable*>(m_table)->setEvictedTable(evicted_table);
-        dynamic_cast<PersistentTable*>(m_table)->setBatchEvicted(catalogTable.batchEvicted());
+        // if vertical partitioning is true
+        // how could I know??????????????????????????????????????
+        // considering evictColumns
+        if(true)
+        {
+			const int numEvictColumns = static_cast<int>(catalogTable.evictColumns().size());
+			vector<ColumnType> evictColumnTypes(numEvictColumns);
+			vector<int32_t> evictColumnLengths(numEvictColumns);
+			vector<bool> evictColumnAllowNull(numEvictColumns);
+			string *evictColumnNames = new string[numEvictColumns];
+
+			map<string, catalog::ColumnRef*>::const_iterator evictColumnIte;
+			for(evictColumnIte = catalog.evictColumns().begin();
+				evictColumnIte != catalog.evictColumns().end(); evictColumnIte++)
+			{
+				const catalog::ColumnRef *evict_column = evictColumnIte->second;
+				const int columnIndex = evict_column->index();
+				const ValueType type = static_cast<ValueType>(evict_column->type());
+				evictColumnTypes[columnIndex] = type;
+
+				const int32_t size = static_cast<int32_t>(evict_column->size());
+				bool varlen = (type == VALUE_TYPE_VARCHAR);
+				const int32_t length = varlen ? size :
+						static_cast<int32_t>(NValue::getTupleStorageSize(type));
+				evictColumnLengths[columnIndex] = length;
+				evictColumnAllowNull[columnIndex] = evict_column->nullable();
+				evictColumnNames[columnIndex] = evict_column->name();
+			}
+
+			TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema(evictColumnTypes,
+					evictColumnLengths, evictColumnAllowNull);
+        }
+        else
+        {
+			TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema();
+
+			// Get the column names for the EvictedTable
+			string *evictedColumnNames = new string[evictedSchema->columnCount()];
+			evictedColumnNames[0] = std::string("BLOCK_ID");
+			evictedColumnNames[1] = std::string("TUPLE_OFFSET");
+
+			// TODO: Should we construct a primary key index?
+			//       For now I'm going to skip that.
+
+			voltdb::Table *evicted_table = TableFactory::getEvictedTable(
+															databaseId,
+															executorContext,
+															evictedName,
+															evictedSchema,
+															evictedColumnNames);
+			// We'll shove the EvictedTable to the PersistentTable
+			// It will be responsible for deleting it in its deconstructor
+			dynamic_cast<PersistentTable*>(m_table)->setEvictedTable(evicted_table);
+			dynamic_cast<PersistentTable*>(m_table)->setBatchEvicted(catalogTable.batchEvicted());
+        }
     } else {
         VOLT_DEBUG("Not creating EvictedTable for table '%s'", catalogTable.name().c_str());
     }

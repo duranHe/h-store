@@ -126,8 +126,8 @@ CatalogType * Table::addChild(const std::string &collectionName, const std::stri
     if (collectionName.compare("evictColumns") == 0) {
     	CatalogType *exists = m_evictColumns.get(childName);
     	if (exists)
-    		return null;
-    	return m_evictColumns.add(chlidName);
+    		return NULL;
+    	return m_evictColumns.add(childName);
     }
     return NULL;
 }
@@ -214,7 +214,7 @@ bool Table::batchEvicted() const {
     return m_batchEvicted;
 }
 
-const CatalogMap<Column> & Table::evictColumns() const {
+const CatalogMap<ColumnRef> & Table::evictColumns() const {
     return m_evictColumns;
 }
 
