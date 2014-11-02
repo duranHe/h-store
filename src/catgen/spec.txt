@@ -128,7 +128,7 @@ begin Table                   "A table (relation) in the database"
     bool mapreduce              "Is this table a MapReduce transaction table?"
     bool evictable              "Can contents of this table be evicted by the anti-cache?"
     bool batchEvicted			"Are contents of this table evicted only along with a parent table and not by itself?"
-    ColumnRef* evictColumn      "Columns to be evicted"
+    ColumnRef* evictColumns      "Columns to be evicted"
 end
 
 begin TableRef
