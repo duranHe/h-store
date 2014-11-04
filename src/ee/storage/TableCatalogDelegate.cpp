@@ -297,7 +297,14 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         // if vertical partitioning is true
         // how could I know??????????????????????????????????????
         // considering evictColumns
-        if(true)
+
+        bool vertical_partitioning_enabled = false;
+
+     	#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        vertical_partitioning_enabled = true;
+		#endif
+
+        if(vertical_partitioning_enabled)
         {
 			const int numEvictColumns = static_cast<int>(catalogTable.evictColumns().size());
 			vector<ValueType> evictColumnTypes(numEvictColumns + 2);
