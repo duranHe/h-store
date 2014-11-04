@@ -300,9 +300,9 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         if(true)
         {
 			const int numEvictColumns = static_cast<int>(catalogTable.evictColumns().size());
-			vector<ValueType> evictColumnTypes(numEvictColumns);
-			vector<int32_t> evictColumnLengths(numEvictColumns);
-			vector<bool> evictColumnAllowNull(numEvictColumns);
+			vector<ValueType> evictColumnTypes(numEvictColumns + 2);
+			vector<int32_t> evictColumnLengths(numEvictColumns + 2);
+			vector<bool> evictColumnAllowNull(numEvictColumns + 2);
 			string *evictColumnNames = new string[numEvictColumns + 2];
 
 			evictColumnNames[0] = std::string("BLOCK_ID");
@@ -317,14 +317,14 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 
 				const int columnIndex = evict_columnRef->index();
 				const ValueType type = static_cast<ValueType>(evict_column->type());
-				evictColumnTypes[columnIndex] = type;
+				evictColumnTypes[columnIndex + 2] = type;
 
 				const int32_t size = static_cast<int32_t>(evict_column->size());
 				bool varlen = (type == VALUE_TYPE_VARCHAR);
 				const int32_t length = varlen ? size :
 						static_cast<int32_t>(NValue::getTupleStorageSize(type));
-				evictColumnLengths[columnIndex] = length;
-				evictColumnAllowNull[columnIndex] = evict_column->nullable();
+				evictColumnLengths[columnIndex + 2] = length;
+				evictColumnAllowNull[columnIndex + 2] = evict_column->nullable();
 				evictColumnNames[columnIndex + 2] = evict_column->name();
 			}
 
