@@ -24,6 +24,7 @@
 #include "catalog.h"
 #include "index.h"
 #include "column.h"
+#include "columnref.h"
 #include "constraint.h"
 #include "materializedviewinfo.h"
 #include "table.h"
@@ -33,10 +34,7 @@ using namespace std;
 
 Table::Table(Catalog *catalog, CatalogType *parent, const string &path, const string &name)
 : CatalogType(catalog, parent, path, name),
-  m_columns(catalog, this, path + "/" + "columns"),
-  m_indexes(catalog, this, path + "/" + "indexes"),
-  m_constraints(catalog, this, path + "/" + "constraints"),
-  m_views(catalog, this, path + "/" + "views")
+  m_columns(catalog, this, path + "/" + "columns"), m_indexes(catalog, this, path + "/" + "indexes"), m_constraints(catalog, this, path + "/" + "constraints"), m_views(catalog, this, path + "/" + "views"), m_evictColumns(catalog, this, path + "/" + "evictColumns")
 {
     CatalogValue value;
     m_childCollections["columns"] = &m_columns;
@@ -51,7 +49,7 @@ Table::Table(Catalog *catalog, CatalogType *parent, const string &path, const st
     m_fields["mapreduce"] = value;
     m_fields["evictable"] = value;
     m_fields["batchEvicted"] = value;
-
+    m_childCollections["evictColumns"] = &m_evictColumns;
 }
 
 Table::~Table() {
@@ -82,6 +80,13 @@ Table::~Table() {
         materializedviewinfo_iter++;
     }
     m_views.clear();
+
+    std::map<std::string, ColumnRef*>::const_iterator columnref_iter = m_evictColumns.begin();
+    while (columnref_iter != m_evictColumns.end()) {
+        delete columnref_iter->second;
+        columnref_iter++;
+    }
+    m_evictColumns.clear();
 
 }
 
@@ -121,6 +126,12 @@ CatalogType * Table::addChild(const std::string &collectionName, const std::stri
             return NULL;
         return m_views.add(childName);
     }
+    if (collectionName.compare("evictColumns") == 0) {
+        CatalogType *exists = m_evictColumns.get(childName);
+        if (exists)
+            return NULL;
+        return m_evictColumns.add(childName);
+    }
     return NULL;
 }
 
@@ -133,6 +144,8 @@ CatalogType * Table::getChild(const std::string &collectionName, const std::stri
         return m_constraints.get(childName);
     if (collectionName.compare("views") == 0)
         return m_views.get(childName);
+    if (collectionName.compare("evictColumns") == 0)
+        return m_evictColumns.get(childName);
     return NULL;
 }
 
@@ -149,6 +162,9 @@ bool Table::removeChild(const std::string &collectionName, const std::string &ch
     }
     if (collectionName.compare("views") == 0) {
         return m_views.remove(childName);
+    }
+    if (collectionName.compare("evictColumns") == 0) {
+        return m_evictColumns.remove(childName);
     }
     return false;
 }

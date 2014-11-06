@@ -36,6 +36,7 @@ public class Table extends CatalogType {
     boolean m_mapreduce;
     boolean m_evictable;
     boolean m_batchEvicted;
+    CatalogMap<ColumnRef> m_evictColumns;
 
     void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {
         super.setBaseValues(catalog, parent, path, name);
@@ -55,6 +56,8 @@ public class Table extends CatalogType {
         m_fields.put("mapreduce", m_mapreduce);
         m_fields.put("evictable", m_evictable);
         m_fields.put("batchEvicted", m_batchEvicted);
+        m_evictColumns = new CatalogMap<ColumnRef>(catalog, this, path + "/" + "evictColumns", ColumnRef.class);
+        m_childCollections.put("evictColumns", m_evictColumns);
     }
 
     public void update() {
@@ -140,6 +143,11 @@ public class Table extends CatalogType {
     /** GETTER: Are contents of this table evicted only along with a parent table and not by itself? */
     public boolean getBatchevicted() {
         return m_batchEvicted;
+    }
+
+    /** GETTER: Columns to be evicted */
+    public CatalogMap<ColumnRef> getEvictcolumns() {
+        return m_evictColumns;
     }
 
     /** SETTER: Is the table replicated? */

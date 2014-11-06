@@ -144,16 +144,27 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
 
 TupleSchema* TupleSchema::createEvictedTupleSchema(const std::vector<ValueType> columnTypes,
 		const std::vector<int32_t> columnLengths, const std::vector<bool> allowNull){
-    // create a schema containing a single column for the block_id
-	columnTypes[0] = VALUE_TYPE_SMALLINT;
-	columnSizes[0] = static_cast<int32_t>(NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT));
-    allowNull[0] = false;
+    const int size = static_cast<int>(columnTypes.size());
+	std::vector<ValueType> types(size + 2);
+	std::vector<int32_t> lengths(size + 2);
+	std::vector<bool> nullable(size + 2);
 
-    columnTypes[1] = VALUE_TYPE_INTEGER;
-    columnSizes[1] = static_cast<int32_t>(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-    allowNull[1] = false;
+	// create a schema containing a single column for the block_id
+	types[0] = VALUE_TYPE_SMALLINT;
+	lengths[0] = static_cast<int32_t>(NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT));
+    nullable[0] = false;
 
-    TupleSchema *blockids_schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, false);
+    types[1] = VALUE_TYPE_INTEGER;
+    lengths[1] = static_cast<int32_t>(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    nullable[1] = false;
+
+    for(int i = 0; i < size; i++) {
+    	types[i + 2] = columnTypes[i];
+    	lengths[i + 2] = columnLengths[i];
+    	nullable[i + 2] = allowNull[i];
+    }
+
+    TupleSchema *blockids_schema = TupleSchema::createTupleSchema(types, lengths, nullable, false);
     return blockids_schema;
 }
     
