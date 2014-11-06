@@ -36,8 +36,7 @@ Table::Table(Catalog *catalog, CatalogType *parent, const string &path, const st
   m_columns(catalog, this, path + "/" + "columns"),
   m_indexes(catalog, this, path + "/" + "indexes"),
   m_constraints(catalog, this, path + "/" + "constraints"),
-  m_views(catalog, this, path + "/" + "views"),
-  m_evictColumns(catalog, this, path + "/" + "evictColumns")
+  m_views(catalog, this, path + "/" + "views")
 {
     CatalogValue value;
     m_childCollections["columns"] = &m_columns;
@@ -52,7 +51,6 @@ Table::Table(Catalog *catalog, CatalogType *parent, const string &path, const st
     m_fields["mapreduce"] = value;
     m_fields["evictable"] = value;
     m_fields["batchEvicted"] = value;
-    m_childCollections["evictColumns"] = &m_evictColumns;
 
 }
 
@@ -123,12 +121,6 @@ CatalogType * Table::addChild(const std::string &collectionName, const std::stri
             return NULL;
         return m_views.add(childName);
     }
-    if (collectionName.compare("evictColumns") == 0) {
-    	CatalogType *exists = m_evictColumns.get(childName);
-    	if (exists)
-    		return NULL;
-    	return m_evictColumns.add(childName);
-    }
     return NULL;
 }
 
@@ -141,8 +133,6 @@ CatalogType * Table::getChild(const std::string &collectionName, const std::stri
         return m_constraints.get(childName);
     if (collectionName.compare("views") == 0)
         return m_views.get(childName);
-    if (collectionName.compare("evictColumns") == 0)
-    	return m_evictColumns.get(childName);
     return NULL;
 }
 
@@ -159,9 +149,6 @@ bool Table::removeChild(const std::string &collectionName, const std::string &ch
     }
     if (collectionName.compare("views") == 0) {
         return m_views.remove(childName);
-    }
-    if (collectionName.compare("evictColumns") == 0) {
-        return m_evictColumns.remove(childName);
     }
     return false;
 }

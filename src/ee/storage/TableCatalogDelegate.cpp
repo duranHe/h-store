@@ -306,8 +306,8 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 
         if(vertical_partitioning_enabled)
         {
-			const int numEvictColumns = static_cast<int>(catalogTable.evictColumns().size());
-			vector<ValueType> evictColumnTypes(numEvictColumns + 2);
+        	const int numEvictColumns = static_cast<int>(catalogTable.evictColumns().size());
+        	vector<ValueType> evictColumnTypes(numEvictColumns + 2);
 			vector<int32_t> evictColumnLengths(numEvictColumns + 2);
 			vector<bool> evictColumnAllowNull(numEvictColumns + 2);
 			string *evictColumnNames = new string[numEvictColumns + 2];

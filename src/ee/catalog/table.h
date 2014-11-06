@@ -32,7 +32,6 @@ class Column;
 class Index;
 class Constraint;
 class MaterializedViewInfo;
-class ColumnRef;
 /**
  * A table (relation) in the database
  */
@@ -54,7 +53,6 @@ protected:
     bool m_mapreduce;
     bool m_evictable;
     bool m_batchEvicted;
-    CatalogMap<ColumnRef> m_evictColumns;
 
     virtual void update();
 
@@ -89,8 +87,6 @@ public:
     bool evictable() const;
     /** GETTER: Are contents of this table evicted only along with a parent table and not by itself? */
     bool batchEvicted() const;
-    /** GETTER: Columns to be evicted */
-    const CatalogMap<ColumnRef> & evictColumns() const;
 };
 
 } // namespace catalog
