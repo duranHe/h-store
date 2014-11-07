@@ -556,6 +556,45 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
     evict_itr.reserve((int64_t)block_size * num_blocks);
 #endif
 
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+    std::vector<int> evictColumnIdx;
+    std::vector<int> antiCacheColumnIdx;
+
+    std::vector<std::string> pTableColumnNames = table->getColumnNames();
+    std::vector<std::string> eTableColumnNames = evictedTable->getColumnNames();
+    int numEvictColumns = evictedTable->columnCount();
+    int numPersistentColumns = table->getColumnCount();
+
+    TupleSchema *pTableSchema = table->schema();
+    std::vector<ValueType> columnTypes;
+    std::vector<int32_t> columnLengths;
+    std::vector<bool> allowNull;
+
+    for(int i = 0; i < numPersistentColumns; i++) {
+    	std::string pColumnName = pTableColumnNames[i];
+    	bool isEvictedColumn = false;
+
+    	for(int j = 2; j < numEvictColumns; j++) {
+    		std::string eColumnName = eTableColumnNames[j];
+    		if(eColumnName.compare(pColumnName) == 0) {
+    			isEvictedColumn = true;
+    			evictColumnIdx.push_back(i);
+    			break;
+    		}
+    	}
+
+    	if(!isEvictedColumn) {
+    		columnTypes.push_back(pTableSchema->columnType(i));
+    		columnLengths.push_back(pTableSchema->columnLength(i));
+    		allowNull.push_back(pTableSchema->columnAllowNull(i));
+    		antiCacheColumnIdx.push_back(i);
+    	}
+    }
+
+    // build the tuple schema for evicted partial tuple in AntiCache
+    TupleSchema *antiCacheSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, allowNull, false);
+#endif
+
     for(int i = 0; i < num_blocks; i++)
     {
 
@@ -616,6 +655,15 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
             VOLT_TRACE("block id is %d for table %s", block_id, table->name().c_str());
             evicted_tuple.setNValue(0, ValueFactory::getSmallIntValue(block_id));
             evicted_tuple.setNValue(1, ValueFactory::getIntegerValue(num_tuples_evicted));
+
+			#ifdef ANTICACHE_VERTICAL_PARTITIONING
+            for(int j = 2; j < numEvictColumns; j++) {
+            	int columnIndex = evictColumnIdx[j - 2];
+            	NValue value = tuple->getNValue(columnIndex);
+            	evicted_tuple.setNValue(j, value);
+            }
+			#endif
+
             evicted_tuple.setEvictedTrue();
             VOLT_TRACE("EvictedTuple: %s", evicted_tuple.debug(evictedTable->name()).c_str());
 
@@ -625,7 +673,19 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
             // Change all of the indexes to point to our new evicted tuple
             table->setEntryToNewAddressForAllIndexes(&tuple, evicted_tuple_address);
 
+
+		#ifdef ANTICACHE_VERTICAL_PARTITIONING
+            // reconstruct a new tuple for the hungry block
+            TableTuple antiCacheTuple(antiCacheSchema);
+            int numAntiCacheColumn = antiCacheColumnIdx.size();
+            for(int j = 0; j < numAntiCacheColumn; j++) {
+            	int columnIndex = antiCacheColumnIdx[j];
+            	antiCacheTuple.setNValue(j, tuple->getNValue(columnIndex));
+            }
+            block.addTuple(antiCacheTuple);
+		#else
             block.addTuple(tuple);
+		#endif
 
             // At this point it's safe for us to delete this mofo
             table->updateStringMemory(- ((int)tuple.getNonInlinedMemorySize()));
