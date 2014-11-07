@@ -48,7 +48,7 @@ class BuildContext:
         self.ARIES= False
         self.ANTICACHE_TIMESTAMPS = True
         self.ANTICACHE_TIMESTAMPS_PRIME = True
-        self.ANTICACHE_VERTICAL_PARTITIONING = False
+        self.ANTICACHE_VERTICAL_PARTITIONING = True
 
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:

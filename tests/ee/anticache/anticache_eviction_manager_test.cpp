@@ -120,7 +120,31 @@ public:
                                                          (0, m_engine->getExecutorContext(), "Foo",
                                                           m_tableSchema, &m_columnNames[0], indexScheme, indexes, 0,
                                                           false, false));
-                
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        int numEvictColumns = 1;
+
+    	vector<ValueType> evictColumnTypes(numEvictColumns);
+    	evictColumnTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
+
+		vector<int32_t> evictColumnLengths(numEvictColumns);
+		evictColumnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+
+		vector<bool> evictColumnAllowNull(numEvictColumns);
+		evictColumnAllowNull.push_back(false);
+
+        std::string evictedColumnNames[2 + numEvictColumns];
+        evictedColumnNames[0] = std::string("BLOCK_ID");
+        evictedColumnNames[1] = std::string("TUPLE_OFFSET");
+        evictedColumnNames[2] = std::string("2");
+
+        cout << "begin build schema" << endl;
+		TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema(evictColumnTypes,
+				evictColumnLengths, evictColumnAllowNull);
+		cout << "schema is correct" << endl;
+		voltdb::Table *evicted_table = TableFactory::getEvictedTable(0, m_engine->getExecutorContext(),
+				"Foo_EVICTED", evictedSchema, evictedColumnNames);
+#else
         TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema();
                 
         // Get the column names for the EvictedTable
@@ -134,7 +158,7 @@ public:
                                                                      "Foo_EVICTED",
                                                                      evictedSchema,
                                                                      &evictedColumnNames[0]);
-        
+#endif
         m_table->setEvictedTable(evicted_table);
     }
     
@@ -164,6 +188,14 @@ public:
     int32_t m_tuplesDeleted;
     
 };
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+TEST_F(AntiCacheEvictionManagerTest, VerticalPartitioning)
+{
+	cout << "begin test" << endl;
+	initTable(true);
+}
+#endif
 
 #ifndef ANTICACHE_TIMESTAMPS
 TEST_F(AntiCacheEvictionManagerTest, GetTupleID)
@@ -445,7 +477,7 @@ TEST_F(AntiCacheEvictionManagerTest, UpdateIndexPerformance)
 TEST_F(AntiCacheEvictionManagerTest, GetTupleTimeStamp)
 {
     initTable(true); 
-    
+
     TableTuple tuple = m_table->tempTuple();
     
     tuple.setNValue(0, ValueFactory::getIntegerValue(m_tuplesInserted++));

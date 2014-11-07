@@ -563,9 +563,9 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
     std::vector<std::string> pTableColumnNames = table->getColumnNames();
     std::vector<std::string> eTableColumnNames = evictedTable->getColumnNames();
     int numEvictColumns = evictedTable->columnCount();
-    int numPersistentColumns = table->getColumnCount();
+    int numPersistentColumns = table->columnCount();
 
-    TupleSchema *pTableSchema = table->schema();
+    const TupleSchema *pTableSchema = table->schema();
     std::vector<ValueType> columnTypes;
     std::vector<int32_t> columnLengths;
     std::vector<bool> allowNull;
@@ -659,7 +659,7 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
 			#ifdef ANTICACHE_VERTICAL_PARTITIONING
             for(int j = 2; j < numEvictColumns; j++) {
             	int columnIndex = evictColumnIdx[j - 2];
-            	NValue value = tuple->getNValue(columnIndex);
+            	NValue value = tuple.getNValue(columnIndex);
             	evicted_tuple.setNValue(j, value);
             }
 			#endif
@@ -677,10 +677,10 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
 		#ifdef ANTICACHE_VERTICAL_PARTITIONING
             // reconstruct a new tuple for the hungry block
             TableTuple antiCacheTuple(antiCacheSchema);
-            int numAntiCacheColumn = antiCacheColumnIdx.size();
+            int numAntiCacheColumn = static_cast<int>(antiCacheColumnIdx.size());
             for(int j = 0; j < numAntiCacheColumn; j++) {
             	int columnIndex = antiCacheColumnIdx[j];
-            	antiCacheTuple.setNValue(j, tuple->getNValue(columnIndex));
+            	antiCacheTuple.setNValue(j, tuple.getNValue(columnIndex));
             }
             block.addTuple(antiCacheTuple);
 		#else
