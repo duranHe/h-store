@@ -125,13 +125,13 @@ public:
         int numEvictColumns = 1;
 
     	vector<ValueType> evictColumnTypes(numEvictColumns);
-    	evictColumnTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
+    	evictColumnTypes[0] = voltdb::VALUE_TYPE_INTEGER;
 
 		vector<int32_t> evictColumnLengths(numEvictColumns);
-		evictColumnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+		evictColumnLengths[0] = NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER);
 
 		vector<bool> evictColumnAllowNull(numEvictColumns);
-		evictColumnAllowNull.push_back(false);
+		evictColumnAllowNull[0] = false;
 
         std::string evictedColumnNames[2 + numEvictColumns];
         evictedColumnNames[0] = std::string("BLOCK_ID");
@@ -194,6 +194,20 @@ TEST_F(AntiCacheEvictionManagerTest, VerticalPartitioning)
 {
 	cout << "begin test" << endl;
 	initTable(true);
+
+	TableTuple tuple = m_table->tempTuple();
+	int num_tuples = 10;
+	for(int i = 0; i < num_tuples; i++) {
+		tuple.setNValue(0, ValueFactory::getIntegerValue(m_tuplesInserted++));
+		tuple.setNValue(1, ValueFactory::getIntegerValue(i * 2));
+		m_table->insertTuple(tuple);
+	}
+
+	long blockSize = 1048576;
+	int numBlocks = 1;
+	cout << "begin eviction" << endl;
+//	Table *resultTable = m_engine->getExecutorContext()->getAntiCacheEvictionManager()->evictBlock(m_table, blockSize, numBlocks);
+//	ASSERT_TRUE(resultTable != NULL);
 }
 #endif
 

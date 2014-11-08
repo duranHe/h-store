@@ -674,7 +674,7 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
             table->setEntryToNewAddressForAllIndexes(&tuple, evicted_tuple_address);
 
 
-		#ifdef ANTICACHE_VERTICAL_PARTITIONING
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
             // reconstruct a new tuple for the hungry block
             TableTuple antiCacheTuple(antiCacheSchema);
             int numAntiCacheColumn = static_cast<int>(antiCacheColumnIdx.size());
@@ -683,9 +683,9 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
             	antiCacheTuple.setNValue(j, tuple.getNValue(columnIndex));
             }
             block.addTuple(antiCacheTuple);
-		#else
+#else
             block.addTuple(tuple);
-		#endif
+#endif
 
             // At this point it's safe for us to delete this mofo
             table->updateStringMemory(- ((int)tuple.getNonInlinedMemorySize()));
