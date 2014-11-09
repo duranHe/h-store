@@ -676,7 +676,8 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
 
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
             // reconstruct a new tuple for the hungry block
-            TableTuple antiCacheTuple(antiCacheSchema);
+            char *antiCacheTupleData = new char[1024];
+            TableTuple antiCacheTuple(antiCacheTupleData, antiCacheSchema);
             int numAntiCacheColumn = static_cast<int>(antiCacheColumnIdx.size());
             for(int j = 0; j < numAntiCacheColumn; j++) {
             	int columnIndex = antiCacheColumnIdx[j];

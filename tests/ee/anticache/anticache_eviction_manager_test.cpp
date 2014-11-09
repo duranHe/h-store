@@ -136,7 +136,7 @@ public:
         std::string evictedColumnNames[2 + numEvictColumns];
         evictedColumnNames[0] = std::string("BLOCK_ID");
         evictedColumnNames[1] = std::string("TUPLE_OFFSET");
-        evictedColumnNames[2] = std::string("2");
+        evictedColumnNames[2] = std::string("1");
 
         cout << "begin build schema" << endl;
 		TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema(evictColumnTypes,
@@ -199,15 +199,26 @@ TEST_F(AntiCacheEvictionManagerTest, VerticalPartitioning)
 	int num_tuples = 10;
 	for(int i = 0; i < num_tuples; i++) {
 		tuple.setNValue(0, ValueFactory::getIntegerValue(m_tuplesInserted++));
-		tuple.setNValue(1, ValueFactory::getIntegerValue(i * 2));
+		tuple.setNValue(1, ValueFactory::getIntegerValue((i + 1) * 2));
 		m_table->insertTuple(tuple);
 	}
 
 	long blockSize = 1048576;
+	m_engine->antiCacheInitialize("/home/duran", blockSize, ANTICACHEDB_BERKELEY);
+
 	int numBlocks = 1;
 	cout << "begin eviction" << endl;
-//	Table *resultTable = m_engine->getExecutorContext()->getAntiCacheEvictionManager()->evictBlock(m_table, blockSize, numBlocks);
-//	ASSERT_TRUE(resultTable != NULL);
+	Table *resultTable = m_engine->getExecutorContext()->getAntiCacheEvictionManager()->evictBlock(m_table, blockSize, numBlocks);
+	ASSERT_TRUE(resultTable != NULL);
+
+	// check data in evictedTable
+//	TableTuple evictedTableTuple(m_table->getEvictedTable()->schema());
+//	EvictionIterator evict_itr(m_table->getEvictedTable());
+//	int index = 0;
+//	while(evict_itr.hasNext()) {
+//		ASSERT_TRUE(evict_itr.next(evictedTableTuple));
+//		cout << evictedTableTuple.getNValue(2).getInteger() << endl;
+//	}
 }
 #endif
 
