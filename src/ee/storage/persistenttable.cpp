@@ -395,14 +395,57 @@ int64_t PersistentTable::unevictTuple(ReferenceSerializeInput * in, int j, int m
     nextFreeTuple(&m_tmpTarget1);
     m_tupleCount++;
 
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+    // construct an index array for columns that were evicted to anticache
+    // as well as the columns that were kept in evicted
+    std::vector<int> antiCacheColumnIndex;
+    std::vector<int> evictedColumnIndex;
+
+    std::vector<std::string> pTableColumnNames = getColumnNames();
+    std::vector<std::string> eTableColumnNames = m_evictedTable->getColumnNames();
+    int numEvictColumns = m_evictedTable->columnCount();
+    int numPersistentColumns = columnCount();
+
+    for(int i = 0; i < numPersistentColumns; i++) {
+    	std::string pColumnName = pTableColumnNames[i];
+    	bool isEvictedColumn = false;
+
+    	for(int j = 2; j < numEvictColumns; j++) {
+    		std::string eColumnName = eTableColumnNames[j];
+
+    		if(pColumnName.compare(eColumnName) == 0) {
+    			evictedColumnIndex.push_back(i);
+    			isEvictedColumn = true;
+    			break;
+    		}
+    	}
+
+    	if(!isEvictedColumn) {
+    		antiCacheColumnIndex.push_back(i);
+    	}
+    }
+
+    // after deserialization, data from the columns in anticache is in the persistentTable tuple
+    int64_t bytesUnevicted = m_tmpTarget1.deserializeWithHeaderFrom(*in, antiCacheColumnIndex);
+#else
+
     // deserialize tuple from unevicted block
     int64_t bytesUnevicted = m_tmpTarget1.deserializeWithHeaderFrom(*in);
-
+#endif
 
     // Note, this goal of the section below is to get a tuple that points to the tuple in the EvictedTable and has the
     // schema of the evicted tuple. However, the lookup has to be done using the schema of the original (unevicted) version
     m_tmpTarget2 = lookupTuple(m_tmpTarget1);       // lookup the tuple in the table
     evicted_tuple.move(m_tmpTarget2.address());
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+    // also copy the data in evictedTable tuple to pTable tuple
+    for(int i = 2; i < numEvictColumns; i++) {
+    	NValue value = evicted_tuple.getNValue(i);
+    	m_tmpTarget1.setNValue(evictedColumnIndex[i - 2], value);
+    }
+#endif
+
     static_cast<EvictedTable*>(m_evictedTable)->deleteEvictedTuple(evicted_tuple);             // delete the EvictedTable tuple
 
     m_tmpTarget1.setEvictedFalse();

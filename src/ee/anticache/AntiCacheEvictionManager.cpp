@@ -565,10 +565,10 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
     int numEvictColumns = evictedTable->columnCount();
     int numPersistentColumns = table->columnCount();
 
-    const TupleSchema *pTableSchema = table->schema();
-    std::vector<ValueType> columnTypes;
-    std::vector<int32_t> columnLengths;
-    std::vector<bool> allowNull;
+//    const TupleSchema *pTableSchema = table->schema();
+//    std::vector<ValueType> columnTypes;
+//    std::vector<int32_t> columnLengths;
+//    std::vector<bool> allowNull;
 
     for(int i = 0; i < numPersistentColumns; i++) {
     	std::string pColumnName = pTableColumnNames[i];
@@ -584,15 +584,15 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
     	}
 
     	if(!isEvictedColumn) {
-    		columnTypes.push_back(pTableSchema->columnType(i));
-    		columnLengths.push_back(pTableSchema->columnLength(i));
-    		allowNull.push_back(pTableSchema->columnAllowNull(i));
+//    		columnTypes.push_back(pTableSchema->columnType(i));
+//    		columnLengths.push_back(pTableSchema->columnLength(i));
+//    		allowNull.push_back(pTableSchema->columnAllowNull(i));
     		antiCacheColumnIdx.push_back(i);
     	}
     }
 
     // build the tuple schema for evicted partial tuple in AntiCache
-    TupleSchema *antiCacheSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, allowNull, false);
+//    TupleSchema *antiCacheSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, allowNull, false);
 #endif
 
     for(int i = 0; i < num_blocks; i++)
@@ -675,14 +675,7 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
 
 
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
-            // reconstruct a new tuple for the hungry block
-            TableTuple antiCacheTuple(antiCacheSchema);
-            int numAntiCacheColumn = static_cast<int>(antiCacheColumnIdx.size());
-            for(int j = 0; j < numAntiCacheColumn; j++) {
-            	int columnIndex = antiCacheColumnIdx[j];
-            	antiCacheTuple.setNValue(j, tuple.getNValue(columnIndex));
-            }
-            block.addTuple(antiCacheTuple);
+            block.addTupleWithIndex(tuple, antiCacheColumnIdx);
 #else
             block.addTuple(tuple);
 #endif

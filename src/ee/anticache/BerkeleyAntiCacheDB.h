@@ -54,6 +54,10 @@ public:
         tuple.serializeWithHeaderTo(out);
     }
 
+    inline void addTupleWithIndex(TableTuple tuple, std::vector<int> columnIndex){
+    	tuple.serializeWithHeaderTo(out, columnIndex);
+    }
+
     inline void writeHeader(std::vector<int> num_tuples_evicted){
         // write out the block header (i.e. number of tuples in block)
         int count = 0;

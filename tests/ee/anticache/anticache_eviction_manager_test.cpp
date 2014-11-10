@@ -203,15 +203,15 @@ TEST_F(AntiCacheEvictionManagerTest, VerticalPartitioning)
 		m_table->insertTuple(tuple);
 	}
 
-//	long blockSize = 1048576;
-//	m_engine->antiCacheInitialize("/home/duran", blockSize, ANTICACHEDB_BERKELEY);
+	long blockSize = 1048576;
+	m_engine->antiCacheInitialize("/home/duran", blockSize, ANTICACHEDB_BERKELEY);
 
-//	int numBlocks = 1;
-//	cout << "begin eviction" << endl;
-//	Table *resultTable = m_engine->getExecutorContext()->getAntiCacheEvictionManager()->evictBlock(m_table, blockSize, numBlocks);
-//	ASSERT_TRUE(resultTable != NULL);
+	int numBlocks = 1;
+	cout << "begin eviction" << endl;
+	Table *resultTable = m_engine->getExecutorContext()->getAntiCacheEvictionManager()->evictBlock(m_table, blockSize, numBlocks);
+	ASSERT_TRUE(resultTable != NULL);
 
-	// check data in evictedTable
+//	// check data in evictedTable
 //	TableTuple evictedTableTuple(m_table->getEvictedTable()->schema());
 //	EvictionIterator evict_itr(m_table->getEvictedTable());
 //	int index = 0;

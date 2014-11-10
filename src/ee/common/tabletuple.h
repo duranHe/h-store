@@ -399,6 +399,9 @@ public:
         void serializeWithHeaderTo(voltdb::SerializeOutput &output);
         int64_t deserializeWithHeaderFrom(voltdb::SerializeInput &tupleIn);
 
+        void serializeWithHeaderTo(voltdb::SerializeOutput &output, std::vector<int> columnIndex);
+        int64_t deserializeWithHeaderFrom(voltdb::SerializeInput &tupleIn, std::vector<int> columnIndex);
+
         void freeObjectColumns();
 
         //#ifdef ARIES
@@ -685,6 +688,36 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
     }
 }
 
+/**
+ * Read data that belongs to selected column
+ * Mainly for vertical partitioning
+ */
+inline int64_t TableTuple::deserializeWithHeaderFrom(voltdb::SerializeInput &tupleIn,
+		std::vector<int> columnIndex) {
+	int64_t total_bytes_deserialized = 0;
+
+	assert(m_schema);
+	assert(m_data);
+
+	tupleIn.readInt();
+	total_bytes_deserialized += sizeof(int);
+
+	memcpy(m_data, tupleIn.getRawPointer(TUPLE_HEADER_SIZE), TUPLE_HEADER_SIZE);
+	total_bytes_deserialized += TUPLE_HEADER_SIZE;
+
+	int size = static_cast<int>(columnIndex.size());
+	for(int i = 0; i < size; i++) {
+		int index = columnIndex[i];
+		const ValueType type = m_schema->columnType(index);
+		const bool isInlined = m_schema->columnIsInlined(index);
+		char *dataPtr = getDataPtr(index);
+		const int32_t columnLength = m_schema->columnLength(index);
+		total_bytes_deserialized += NValue::deserializeFrom(tupleIn, type, dataPtr, isInlined, columnLength, NULL);
+	}
+
+	return total_bytes_deserialized;
+}
+
 inline int64_t TableTuple::deserializeWithHeaderFrom(voltdb::SerializeInput &tupleIn) {
 
     int64_t total_bytes_deserialized = 0;
@@ -787,6 +820,29 @@ inline int64_t TableTuple::deserializeWithHeaderFrom(voltdb::SerializeInput &tup
     //                                              message);
     //        }
     //    }
+}
+
+/**
+ * Write selected column data to anticache according to columnIndex
+ * Mainly for vertical partitioning
+ */
+inline void TableTuple::serializeWithHeaderTo(voltdb::SerializeOutput &output, std::vector<int> columnIndex) {
+	assert(m_schema);
+	assert(m_data);
+
+	size_t start = output.position();
+	output.writeInt(0);
+
+	output.writeBytes(m_data, TUPLE_HEADER_SIZE);
+
+	int size = static_cast<int>(columnIndex.size());
+	for(int i = 0; i < size; i++) {
+		NValue value = getNValue(columnIndex[i]);
+		value.serializeTo(output);
+	}
+
+	int32_t serialized_size = static_cast<int32_t>(output.position() - start - sizeof(int32_t));
+	output.writeIntAt(start, serialized_size);
 }
 
 inline void TableTuple::serializeWithHeaderTo(voltdb::SerializeOutput &output) {
