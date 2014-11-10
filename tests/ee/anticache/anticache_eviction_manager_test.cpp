@@ -219,6 +219,8 @@ TEST_F(AntiCacheEvictionManagerTest, VerticalPartitioning)
 //		ASSERT_TRUE(evict_itr.next(evictedTableTuple));
 //		cout << evictedTableTuple.getNValue(2).getInteger() << endl;
 //	}
+
+	cleanupTable();
 }
 #endif
 
