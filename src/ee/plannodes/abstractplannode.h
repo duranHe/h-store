@@ -184,6 +184,10 @@ protected:
     bool m_isInline;
 
     std::vector<int32_t> m_outputColumnGuids;
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+    bool accessColumnInAntiCache;
+#endif
 };
 
 }
