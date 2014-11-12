@@ -44,10 +44,21 @@ class EvictedTable : public PersistentTable {
     
         void deleteEvictedTuple(TableTuple source);
 
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        std::vector<int> getAntiCacheColumnIndex();
+        std::vector<int> getEvictedColumnIndex();
+        void setVerticalPartitions(PersistentTable * pTable);
+#endif
+
     
     protected:
         
         EvictedTable(ExecutorContext *ctx);
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        std::vector<int> antiCacheColumnIndex;
+        std::vector<int> evictedColumnIndex;
+#endif
     
     };
 }

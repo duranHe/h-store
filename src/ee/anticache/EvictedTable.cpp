@@ -75,6 +75,54 @@ void EvictedTable::deleteEvictedTuple(TableTuple source) {
     
     deleteTupleStorage(source);
 }
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+std::vector<int> EvictedTable::getAntiCacheColumnIndex() {
+	return antiCacheColumnIndex;
+}
+
+std::vector<int> EvictedTable::getEvictedColumnIndex() {
+	return evictedColumnIndex;
+}
+
+void EvictedTable::setVerticalPartitions(PersistentTable * pTable) {
+	std::vector<std::string> pTableColumnNames = pTable->getColumnNames();
+	std::vector<std::string> eTableColumnNames = this->getColumnNames();
+	int numEvictColumns = this->columnCount();
+	int numPersistentColumns = pTable->columnCount();
+
+    // fill the evictColumnIdx, follow the column order of evictedTable schema
+    for(int i = 2; i < numEvictColumns; i++) {
+    	std::string eColumnName = eTableColumnNames[i];
+    	for(int j = 0; j < numPersistentColumns; j++) {
+    		std::string pColumnName = pTableColumnNames[j];
+
+    		if(eColumnName.compare(pColumnName) == 0) {
+    			evictedColumnIndex.push_back(j);
+    			break;
+    		}
+    	}
+    }
+
+    // fill the antiCacheColumnIdx, follow the column order of pTable schema
+    for(int i = 0; i < numPersistentColumns; i++) {
+    	std::string pColumnName = pTableColumnNames[i];
+    	bool isEvictedColumn = false;
+
+    	for(int j = 2; j < numEvictColumns; j++) {
+    		std::string eColumnName = eTableColumnNames[j];
+    		if(eColumnName.compare(pColumnName) == 0) {
+    			isEvictedColumn = true;
+    			break;
+    		}
+    	}
+
+    	if(!isEvictedColumn) {
+    		antiCacheColumnIndex.push_back(i);
+    	}
+    }
+}
+#endif
     
 }
 
