@@ -398,7 +398,43 @@ int64_t PersistentTable::unevictTuple(ReferenceSerializeInput * in, int j, int m
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
     // construct an index array for columns that were evicted to anticache
     // as well as the columns that were kept in evicted
-    std::vector<int> antiCacheColumnIndex = static_cast<EvictedTable*>(m_evictedTable)->getAntiCacheColumnIndex();
+    std::vector<int> antiCacheColumnIndex;
+    std::vector<int> evictedColumnIndex;
+
+    std::vector<std::string> pTableColumnNames = getColumnNames();
+    std::vector<std::string> eTableColumnNames = m_evictedTable->getColumnNames();
+    int numEvictColumns = m_evictedTable->columnCount();
+    int numPersistentColumns = columnCount();
+
+    for(int i = 2; i < numEvictColumns; i++) {
+    	std::string eColumnName = eTableColumnNames[i];
+    	for(int j = 0; j < numPersistentColumns; j++) {
+    		std::string pColumnName = pTableColumnNames[j];
+
+    		if(eColumnName.compare(pColumnName) == 0) {
+    			evictedColumnIndex.push_back(j);
+    			break;
+    		}
+    	}
+    }
+
+    for(int i = 0; i < numPersistentColumns; i++) {
+    	std::string pColumnName = pTableColumnNames[i];
+    	bool isEvictedColumn = false;
+
+    	for(int j = 2; j < numEvictColumns; j++) {
+    		std::string eColumnName = eTableColumnNames[j];
+
+    		if(pColumnName.compare(eColumnName) == 0) {
+    			isEvictedColumn = true;
+    			break;
+    		}
+    	}
+
+    	if(!isEvictedColumn) {
+    		antiCacheColumnIndex.push_back(i);
+    	}
+    }
 
     // after deserialization, data from the columns in anticache is in the persistentTable tuple
     int64_t bytesUnevicted = m_tmpTarget1.deserializeWithHeaderFrom(*in, antiCacheColumnIndex);
@@ -415,9 +451,6 @@ int64_t PersistentTable::unevictTuple(ReferenceSerializeInput * in, int j, int m
 
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
     // also copy the data in evictedTable tuple to pTable tuple
-    int numEvictColumns = m_evictedTable->columnCount();
-    std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(m_evictedTable)->getEvictedColumnIndex();
-
     for(int i = 2; i < numEvictColumns; i++) {
     	NValue value = evicted_tuple.getNValue(i);
     	m_tmpTarget1.setNValue(evictedColumnIndex[i - 2], value);

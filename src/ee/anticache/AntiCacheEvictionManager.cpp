@@ -557,11 +557,55 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
 #endif
 
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
-    // set up the vertical partitions first before eviction
-    static_cast<EvictedTable*>(evictedTable)->setVerticalPartitions(table);
+    std::vector<int> evictColumnIdx;
+    std::vector<int> antiCacheColumnIdx;
 
-    std::vector<int> evictColumnIdx = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
-    std::vector<int> antiCacheColumnIdx = static_cast<EvictedTable*>(evictedTable)->getAntiCacheColumnIndex();
+    std::vector<std::string> pTableColumnNames = table->getColumnNames();
+    std::vector<std::string> eTableColumnNames = evictedTable->getColumnNames();
+    int numEvictColumns = evictedTable->columnCount();
+    int numPersistentColumns = table->columnCount();
+
+//    const TupleSchema *pTableSchema = table->schema();
+//    std::vector<ValueType> columnTypes;
+//    std::vector<int32_t> columnLengths;
+//    std::vector<bool> allowNull;
+
+    // fill the evictColumnIdx, follow the column order of evictedTable schema
+    for(int i = 2; i < numEvictColumns; i++) {
+    	std::string eColumnName = eTableColumnNames[i];
+    	for(int j = 0; j < numPersistentColumns; j++) {
+    		std::string pColumnName = pTableColumnNames[j];
+
+    		if(eColumnName.compare(pColumnName) == 0) {
+    			evictColumnIdx.push_back(j);
+    			break;
+    		}
+    	}
+    }
+
+    // fill the antiCacheColumnIdx, follow the column order of pTable schema
+    for(int i = 0; i < numPersistentColumns; i++) {
+    	std::string pColumnName = pTableColumnNames[i];
+    	bool isEvictedColumn = false;
+
+    	for(int j = 2; j < numEvictColumns; j++) {
+    		std::string eColumnName = eTableColumnNames[j];
+    		if(eColumnName.compare(pColumnName) == 0) {
+    			isEvictedColumn = true;
+    			break;
+    		}
+    	}
+
+    	if(!isEvictedColumn) {
+//    		columnTypes.push_back(pTableSchema->columnType(i));
+//    		columnLengths.push_back(pTableSchema->columnLength(i));
+//    		allowNull.push_back(pTableSchema->columnAllowNull(i));
+    		antiCacheColumnIdx.push_back(i);
+    	}
+    }
+
+    // build the tuple schema for evicted partial tuple in AntiCache
+//    TupleSchema *antiCacheSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, allowNull, false);
 #endif
 
     for(int i = 0; i < num_blocks; i++)
@@ -626,7 +670,6 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
             evicted_tuple.setNValue(1, ValueFactory::getIntegerValue(num_tuples_evicted));
 
             #ifdef ANTICACHE_VERTICAL_PARTITIONING
-            int numEvictColumns = evictedTable->columnCount();
             for(int j = 2; j < numEvictColumns; j++) {
             	int columnIndex = evictColumnIdx[j - 2];
             	NValue value = tuple.getNValue(columnIndex);
