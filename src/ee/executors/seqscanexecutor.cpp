@@ -299,10 +299,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *tra
                 // VOLT_INFO("Tuple in seq scan is evicted %s", m_catalogTable->name().c_str());
 
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
-//                ??????????????tempTuple;
+//                TableTuple tempTuple = target_table->tempTuple();
 
 #endif
-
                 // Tell the EvictionManager's internal tracker that we touched this mofo
                 eviction_manager->recordEvictedAccess(m_catalogTable, &evictedTuple);
                 

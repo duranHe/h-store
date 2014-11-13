@@ -328,6 +328,8 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 					evictColumnLengths, evictColumnAllowNull);
 		voltdb::Table *evicted_table = TableFactory::getEvictedTable(databaseId,
 				executorContext, evictedName, evictedSchema, evictColumnNames);
+
+		dynamic_cast<EvictedTable*>(evicted_table)->setVerticalPartitions(dynamic_cast<PersistentTable*>(m_table));
 		dynamic_cast<PersistentTable*>(m_table)->setEvictedTable(evicted_table);
 		delete[] evictColumnNames;
 #else
