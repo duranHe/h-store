@@ -695,6 +695,9 @@ public abstract class PlanNodeUtil {
         if (node.isInline() == false)
             sb.append(orig_spacer).append(NODE_PREFIX + node.toString() + "\n");
         sb.append(inner_spacer).append("Inline[" + node.isInline() + "]\n");
+        
+        sb.append(inner_spacer).append("AntiCachePredicate[" + node.antiCachePredicate() + "]\n");
+        sb.append(inner_spacer).append("AntiCacheProjection[" + node.antiCacheProjection() + "]\n");
 
         // AbstractJoinPlanNode
         if (node instanceof AbstractJoinPlanNode) {

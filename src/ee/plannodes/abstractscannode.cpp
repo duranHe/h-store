@@ -179,6 +179,22 @@ void
 AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj,
                                          const catalog::Database* catalog_db)
 {
+	Value antiCachePredicateValue = find_value(obj, "ANTICACHE_PREDICATE");
+	if(antiCachePredicateValue == Value::null) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractScanPlanNode::loadFromJSONObject:"
+                                      " Can't find ANTICACHE_PREDICATE value");
+	}
+	m_antiCachePredicate = antiCachePredicateValue.get_bool();
+
+	Value antiCacheProjectionValue = find_value(obj, "ANTICACHE_PROJECTION");
+	if(antiCacheProjectionValue == Value::null) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractScanPlanNode::loadFromJSONObject:"
+                                      " Can't find ANTICACHE_PROJECTION value");
+	}
+	m_antiCacheProjection = antiCacheProjectionValue.get_bool();
+
     Value outputColumnsValue = find_value(obj, "OUTPUT_COLUMNS");
     if (outputColumnsValue == Value::null)
     {

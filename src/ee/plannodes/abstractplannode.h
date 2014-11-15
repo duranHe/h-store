@@ -140,6 +140,10 @@ public:
         return next++;
     }
 
+    // getter for vertical partitioning
+    bool getAntiCachePredicate() const;
+    bool getAntiCacheProjection() const;
+
 protected:
     virtual void loadFromJSONObject(json_spirit::Object& obj,
                                     const catalog::Database *catalog_db) = 0;
@@ -184,6 +188,10 @@ protected:
     bool m_isInline;
 
     std::vector<int32_t> m_outputColumnGuids;
+
+    // temporary use for vertical partitioning
+    bool m_antiCachePredicate;
+    bool m_antiCacheProjection;
 };
 
 }

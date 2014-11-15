@@ -61,6 +61,7 @@
 
 #ifdef ANTICACHE
 #include "anticache/AntiCacheEvictionManager.h"
+#include "anticache/EvictedTable.h"
 #endif
 
 using namespace voltdb;
@@ -294,66 +295,54 @@ bool SeqScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *tra
             VOLT_DEBUG("Created EvictedTable iterator for %s", evictedTable->name().c_str());
 
             int num_evicted = 0;
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+            bool needAccessAntiCache = node->getAntiCachePredicate() ||
+            		node->getAntiCacheProjection();
+#endif
+
             while (evictedIterator.next(evictedTuple)) {
                 assert(evictedTuple.isEvicted());
                 // VOLT_INFO("Tuple in seq scan is evicted %s", m_catalogTable->name().c_str());
 
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
-                /*bool needAccessAntiCache = false;
-                TableTuple &outputTuple = output_table->tempTuple();
+                // predicate on antiCache column
+                // or projection on antiCache column
+                if(needAccessAntiCache) {
+                    eviction_manager->recordEvictedAccess(m_catalogTable, &evictedTuple);
 
-                //TO DO: get the value from the plannode
-                bool predicateOnAntiCacheColumn = false;
-
-                // if predicate on anticache column
-                // then we need to access anticache
-                if(predicateOnAntiCacheColumn) {
-                	needAccessAntiCache = true;
+                    tuple_ctr++;
+                    num_evicted++;
                 } else {
-
                 	// form a tuple for predicate evalution
                 	TableTuple tempTuple = target_table->tempTuple();
                 	std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
 
+                	// we don't care about the garbage in the column we don't want
                 	int numEvictedColumn = evictedTable->columnCount();
-                    for(int i = 2; i < numEvictedColumn; i++) {
-                    	NValue value = evictedTuple.getNValue(i);
-                    	tempTuple.setNValue(evictedColumnIndex[i - 2], value);
-                    }
+                	for(int i = 2; i < numEvictedColumn; i++) {
+                		NValue value = evictedTuple.getNValue(i);
+                	    tempTuple.setNValue(evictedColumnIndex[i - 2], value);
+                	}
 
                     // if no predicate, or tuple matches the predicate
-                    // this tuple is promising
-                    // keep processing
+                    // insert this tuple to output_table
                     if(predicate == NULL || predicate->eval(&tempTuple, NULL).isTrue()) {
 
-                    	// final step: if no projection, we need to have all the columns,
-                    	// which means we need to access anticache
-                    	if(projection_node == NULL) {
-                    		needAccessAntiCache = true;
-                    	} else { // ??????? questoin: why we don't care about the garbage in other columns?
-                    		for(int ctr = 0; ctr < num_of_columns; ctr++) {
-                    			NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tempTuple, NULL);
-                    			outputTuple.setNValue(ctr, value);
-                    		}
+                    	TableTuple &outputTuple = output_table->tempTuple();
+                    	for(int ctr = 0; ctr < num_of_columns; ctr++) {
+                    		NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tempTuple, NULL);
+                    		outputTuple.setNValue(ctr, value);
                     	}
+                    	if(!output_table->insertTuple(outputTuple)) {
+                    		return false;
+                    	}
+                    	tuple_ctr++;
 
                     } else { // otherwise just skip this tuple
                     	continue;
                     }
                 }
-
-                // Now let's see whether we need to access anticache
-                // If so, do as normal because the txn will abort
-                if(needAccessAntiCache) {
-                    eviction_manager->recordEvictedAccess(m_catalogTable, &evictedTuple);
-                } else { // insert this tuple to the outout table ???????????????garbage column
-                	if(!output_table->insertTuple(outputTuple)) {
-                		return false;
-                	}
-                }
-
-                tuple_ctr++;
-                num_evicted++;*/
 #else
                 // Tell the EvictionManager's internal tracker that we touched this mofo
                 eviction_manager->recordEvictedAccess(m_catalogTable, &evictedTuple);
@@ -361,6 +350,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *tra
                 tuple_ctr++;
                 num_evicted++;
 #endif
+
                 if (limit >= 0 && tuple_ctr >= limit) {
                     break;
                 }

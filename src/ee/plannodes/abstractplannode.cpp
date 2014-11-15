@@ -414,3 +414,14 @@ AbstractPlanNode::getColumnIndexFromGuid(int guid,
     }
     return child->getColumnIndexFromGuid(guid, db);
 }
+
+bool
+AbstractPlanNode::getAntiCachePredicate() const
+{
+	return m_antiCachePredicate;
+}
+
+bool AbstractPlanNode::getAntiCacheProjection() const
+{
+	return m_antiCacheProjection;
+}

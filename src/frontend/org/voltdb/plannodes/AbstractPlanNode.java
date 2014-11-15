@@ -49,6 +49,9 @@ public abstract class AbstractPlanNode implements JSONString, Cloneable, Compara
         PARENT_IDS,
         OUTPUT_COLUMNS,
         IS_INLINE,
+        // temporary use for vertical partitioning
+        ANTICACHE_PREDICATE,
+        ANTICACHE_PROJECTION,
     }
 
     private int m_id = -1;
@@ -74,6 +77,11 @@ public abstract class AbstractPlanNode implements JSONString, Cloneable, Compara
     protected boolean m_isInline = false;
 
     protected final PlannerContext m_context;
+    
+    // temp use for vertical partitioning
+    // should be set based on the SQL query
+    protected boolean m_antiCachePredicate = false;
+    protected boolean m_antiCacheProjection = false;
 
     /**
      * Instantiates a new plan node.
@@ -508,6 +516,22 @@ public abstract class AbstractPlanNode implements JSONString, Cloneable, Compara
     public Boolean isInline() {
         return m_isInline;
     }
+    
+    /**
+     * 
+     * @return Is query predicate on anticache column
+     */
+    public Boolean antiCachePredicate() {
+        return m_antiCachePredicate;
+    }
+    
+    /**
+     * 
+     * @return Is the projection on anticache column
+     */
+    public Boolean antiCacheProjection() {
+        return m_antiCacheProjection;
+    }
 
 
     /**
@@ -678,6 +702,9 @@ public abstract class AbstractPlanNode implements JSONString, Cloneable, Compara
         stringer.key(Members.ID.name()).value(m_id);
         stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
 
+        stringer.key(Members.ANTICACHE_PREDICATE.name()).value(m_antiCachePredicate);
+        stringer.key(Members.ANTICACHE_PROJECTION.name()).value(m_antiCacheProjection);
+        
         stringer.key(Members.IS_INLINE.name()).value(m_isInline);
         stringer.key(Members.INLINE_NODES.name()).array();
         PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
@@ -730,6 +757,10 @@ public abstract class AbstractPlanNode implements JSONString, Cloneable, Compara
             e.printStackTrace();
             return null;
         }
+        
+        node.m_antiCachePredicate = obj.getBoolean(Members.ANTICACHE_PREDICATE.name());
+        node.m_antiCacheProjection = obj.getBoolean(Members.ANTICACHE_PROJECTION.name());
+        
         node.m_id = obj.getInt(Members.ID.name());
         node.m_isInline = obj.getBoolean(Members.IS_INLINE.name());
         
