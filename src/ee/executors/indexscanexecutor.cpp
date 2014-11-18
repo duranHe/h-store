@@ -68,6 +68,7 @@
 
 #ifdef ANTICACHE
 #include "anticache/AntiCacheEvictionManager.h"
+#include "anticache/EvictedTable.h"
 #endif
 
 using namespace voltdb;
@@ -509,6 +510,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
     bool hasEvictedTable = (eviction_manager != NULL && m_targetTable->getEvictedTable() != NULL);
     #endif
 
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+    bool needAccessAntiCache = node->getAntiCachePredicate() ||
+    		node->getAntiCacheProjection();
+#endif
     //
     // We have to different nextValue() methods for different lookup types
     //
@@ -527,6 +533,36 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
         #ifdef ANTICACHE
         // We are pointing to an entry for an evicted tuple
         if (hasEvictedTable && m_tuple.isEvicted()) {
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        	// If we still need to access AntiCache,
+        	// just do as normal
+        	if(needAccessAntiCache) {
+                VOLT_DEBUG("Tuple in index scan on %s is evicted. Current txn will have to be restarted...",
+                           m_targetTable->name().c_str());
+
+                // Tell the EvictionManager's internal tracker that we touched this mofo
+                eviction_manager->recordEvictedAccess(m_catalogTable, &m_tuple);
+                continue;
+
+            // Otherwise, we can form a temporary target_table tuple
+            // It is only used for expression evaluation
+            // We still use the old m_tuple for index update, maybe
+        	} else {
+        		TableTuple &tempTuple = m_targetTable->tempTuple();
+        		Table evictedTable = m_targetTable->getEvictedTable();
+
+            	std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
+
+            	// we don't care about the garbage in the column we don't want
+            	int numEvictedColumn = evictedTable->columnCount();
+            	for(int i = 2; i < numEvictedColumn; i++) {
+            		// so m_tuple here is actually an evictedTable tuple
+            		NValue value = m_tuple.getNValue(i);
+            	    tempTuple.setNValue(evictedColumnIndex[i - 2], value);
+            	}
+        	}
+#else
             VOLT_DEBUG("Tuple in index scan on %s is evicted. Current txn will have to be restarted...",
                        m_targetTable->name().c_str());      
 
@@ -538,6 +574,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
             // There is nothing else we can do with it (i.e., check expressions).
             // I don't know why this wasn't here in the first place?
             continue;
+#endif
         }
         #endif        
         

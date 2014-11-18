@@ -315,7 +315,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *tra
                     num_evicted++;
                 } else {
                 	// form a tuple for predicate evalution
-                	TableTuple tempTuple = target_table->tempTuple();
+                	TableTuple &tempTuple = target_table->tempTuple();
                 	std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
 
                 	// we don't care about the garbage in the column we don't want
@@ -335,6 +335,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *tra
                     		outputTuple.setNValue(ctr, value);
                     	}
                     	if(!output_table->insertTuple(outputTuple)) {
+                    		VOLT_ERROR("Failed to insert evicted tuple from table '%s' into"
+                    		                                   " output table '%s'",
+                    		                                   evictedTable->name().c_str(),
+                    		                                   output_table->name().c_str());
                     		return false;
                     	}
                     	tuple_ctr++;
