@@ -512,8 +512,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
 
 
 #ifdef ANTICACHE_VERTICAL_PARTITIONING
-    bool needAccessAntiCache = node->getAntiCachePredicate() ||
-    		node->getAntiCacheProjection();
+    bool needAccessAntiCache = m_node->getAntiCachePredicate() ||
+    		m_node->getAntiCacheProjection();
+    bool aggregateOnTempTuple = false;
 #endif
     //
     // We have to different nextValue() methods for different lookup types
@@ -530,6 +531,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
             tracker->markTupleRead(m_targetTable, &m_tuple);
         }
         
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        bool useTempTuple = false;
+		TableTuple &tempTuple = m_targetTable->tempTuple();
+#endif
+
         #ifdef ANTICACHE
         // We are pointing to an entry for an evicted tuple
         if (hasEvictedTable && m_tuple.isEvicted()) {
@@ -547,11 +553,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
 
             // Otherwise, we can form a temporary target_table tuple
             // It is only used for expression evaluation
-            // We still use the old m_tuple for index update, maybe
         	} else {
-        		TableTuple &tempTuple = m_targetTable->tempTuple();
-        		Table evictedTable = m_targetTable->getEvictedTable();
-
+        		Table *evictedTable = m_targetTable->getEvictedTable();
             	std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
 
             	// we don't care about the garbage in the column we don't want
@@ -561,6 +564,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
             		NValue value = m_tuple.getNValue(i);
             	    tempTuple.setNValue(evictedColumnIndex[i - 2], value);
             	}
+            	useTempTuple = true;
         	}
 #else
             VOLT_DEBUG("Tuple in index scan on %s is evicted. Current txn will have to be restarted...",
@@ -577,7 +581,139 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
 #endif
         }
         #endif        
-        
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        if(useTempTuple) {
+
+        	// check end_expression
+        	if(end_expression != NULL && end_expression->eval(&tempTuple, NULL).isFalse()) {
+                VOLT_DEBUG("End Expression evaluated to false, stopping scan");
+                break;
+        	}
+
+        	// check post-predicate
+        	if(post_expression == NULL || post_expression->eval(&tempTuple, NULL).isTrue()) {
+        		// we don't need to do anything about the eviction chain
+
+        		// distinct
+        		if(m_distinctNode != NULL) {
+        			NValue value = tempTuple.getNValue(m_distinctColumn);
+        			if(m_distinctValueSet.insert(value).second == false) {
+        				continue;
+        			}
+        		}
+
+        		// aggregate
+        		if(m_aggregateNode != NULL) {
+        			if (aggregate_isset == false ||
+        			    m_aggregateCompareValue == VALUE_COMPARE_LESSTHAN ?
+        			    m_tuple.getNValue(m_aggregateColumnIdx).op_lessThan(aggregate_value).isTrue() :
+        			    m_tuple.getNValue(m_aggregateColumnIdx).op_greaterThan(aggregate_value).isTrue())
+        			{
+        				aggregate_value = tempTuple.getNValue(m_aggregateColumnIdx);
+
+        				// careful, tempTuple is a reused address
+        				// we still remember m_tuple address
+        				// but later on outside the while loop
+        				// we need to modify the tuple because it is a evicted tuple
+        				aggregate_tuple_address = m_tuple.address();
+        				aggregateOnTempTuple = true;
+        				aggregate_isset = true;
+        			}
+
+        		// projection
+        		} else if(m_projectionNode != NULL) {
+        			TableTuple &outputTuple = m_outputTable->tempTuple();
+        			if (m_projectionAllTupleArray != NULL) {
+        			    VOLT_DEBUG("sweet, all tuples");
+        			    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+        			        outputTuple.setNValue(ctr, tempTuple.getNValue(m_projectionAllTupleArray[ctr]));
+        			    }
+        			} else {
+        			    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+        			        outputTuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tempTuple, NULL));
+        			    }
+        			}
+        			m_outputTable->insertTupleNonVirtual(outputTuple);
+        			tuples_written++;
+
+        		// straight insert
+        		// it won't happen
+        		} else {
+
+        		}
+        	}
+
+        // this m_tuple is a PersistentTable tuple
+        // do as we did without VerticalPartitioning
+        // ugly code.....
+        } else {
+        	// end_expression
+        	if(end_expression != NULL && end_expression->eval(&m_tuple, NULL).isFalse()) {
+                VOLT_DEBUG("End Expression evaluated to false, stopping scan");
+                break;
+        	}
+
+        	//post_expression
+        	if(post_expression == NULL || post_expression->eval(&m_tuple, NULL).isTrue()) {
+
+				#ifdef ANTICACHE
+        		if(hasEvictedTable) {
+        			eviction_manager->updateTuple(m_targetTable, &m_tuple, false);
+        		}
+				#endif
+
+        		//distinct
+        		if(m_distinctNode != NULL) {
+        			NValue value = m_tuple.getNValue(m_distinctColumn);
+        			if(m_distinctValueSet.insert(value).second == false) {
+        				continue;
+        			}
+        		}
+
+        		// aggregate
+        		if(m_aggregateNode != NULL) {
+                    if (aggregate_isset == false ||
+                        m_aggregateCompareValue == VALUE_COMPARE_LESSTHAN ?
+                        m_tuple.getNValue(m_aggregateColumnIdx).op_lessThan(aggregate_value).isTrue() :
+                        m_tuple.getNValue(m_aggregateColumnIdx).op_greaterThan(aggregate_value).isTrue())
+                    {
+                        aggregate_value = m_tuple.getNValue(m_aggregateColumnIdx);
+                        aggregate_tuple_address = m_tuple.address();
+                        aggregateOnTempTuple = false;
+                        aggregate_isset = true;
+                    }
+
+                // projection
+        		} else if(m_projectionNode != NULL) {
+        			TableTuple &outputTuple = m_outputTable->tempTuple();
+        			if (m_projectionAllTupleArray != NULL) {
+        			    VOLT_DEBUG("sweet, all tuples");
+        			    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+        			        outputTuple.setNValue(ctr, m_tuple.getNValue(m_projectionAllTupleArray[ctr]));
+        			    }
+        			} else {
+        			    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+        			        outputTuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&m_tuple, NULL));
+        			    }
+        			}
+        			m_outputTable->insertTupleNonVirtual(outputTuple);
+        			tuples_written++;
+
+        		// straight insert
+        		} else {
+        			m_outputTable->insertTupleNonVirtual(m_tuple);
+        			tuples_written++;
+        		}
+        	}
+        }
+
+        // limit
+        if(m_limitNode != NULL && tuples_written >= m_limitSize) {
+        	VOLT_DEBUG("Hit limit of %d tuples. Halting scan", tuples_written);
+        	break;
+        }
+#else
         //
         // First check whether the end_expression is now false
         //
@@ -586,6 +722,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
             VOLT_DEBUG("End Expression evaluated to false, stopping scan");
             break;
         }
+
         //
         // Then apply our post-predicate to do further filtering
         //
@@ -666,8 +803,76 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
                 break;
             }
         }
+#endif //end of vertical partition directive
     } // WHILE
 
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+    if(m_aggregateNode != NULL && aggregate_isset) {
+
+    	// if aggregation was on a tempTuple,
+    	// it means aggregate_tuple_address is a evicted tuple
+    	// we need transform it into a normal tuple first
+    	if(aggregateOnTempTuple) {
+    		TableTuple &tempTuple = m_targetTable->tempTuple();
+    		Table *evictedTable = m_targetTable->getEvictedTable();
+        	std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
+
+        	// we don't care about the garbage in the column we don't want
+        	int numEvictedColumn = evictedTable->columnCount();
+        	for(int i = 2; i < numEvictedColumn; i++) {
+        		// so m_tuple here is actually an evictedTable tuple
+        		NValue value = m_tuple.getNValue(i);
+        	    tempTuple.setNValue(evictedColumnIndex[i - 2], value);
+        	}
+
+        	// then we can use this address because all we want is in it
+        	aggregate_tuple_address = tempTuple.address();
+    	}
+
+    	m_tuple.move(aggregate_tuple_address);
+
+    	// projection
+    	if(m_projectionNode != NULL) {
+            TableTuple &temp_tuple = m_outputTable->tempTuple();
+            if (m_projectionAllTupleArray != NULL) {
+                for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                    temp_tuple.setNValue(ctr,
+                                         m_tuple.getNValue(m_projectionAllTupleArray[ctr]));
+                }
+            } else {
+                for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                    temp_tuple.setNValue(ctr,
+                                         m_projectionExpressions[ctr]->eval(&m_tuple, NULL));
+                }
+            }
+            m_outputTable->insertTupleNonVirtual(temp_tuple);
+
+            #ifdef ANTICACHE
+            // If m_tuple is a evicted tuple
+            // then we don't need to change the eviction chain.
+            if(!aggregateOnTempTuple) {
+            	if(hasEvictedTable) {
+            		eviction_manager->updateTuple(m_targetTable, &m_tuple, false);
+            	}
+            }
+			#endif
+
+        // straight insert
+    	} else {
+            m_outputTable->insertTupleNonVirtual(m_tuple);
+
+            #ifdef ANTICACHE
+            // If m_tuple is a evicted tuple
+            // then we don't need to change the eviction chain.
+            if(!aggregateOnTempTuple) {
+            	if(hasEvictedTable) {
+            		eviction_manager->updateTuple(m_targetTable, &m_tuple, false);
+            	}
+            }
+			#endif
+    	}
+    }
+#else
     //
     // Inline Aggregate
     //
@@ -709,7 +914,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
             #endif
         }
     }
-    
+#endif // endif of ANTICACHE_VERTICAL_PARTITIONING
+
     #ifdef ANTICACHE
     // throw exception indicating evicted blocks are needed
     if (hasEvictedTable && eviction_manager->hasEvictedAccesses()) {
