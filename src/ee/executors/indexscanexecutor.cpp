@@ -544,26 +544,26 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
         	// If we still need to access AntiCache,
         	// just do as normal
         	if(needAccessAntiCache) {
-                VOLT_DEBUG("Tuple in index scan on %s is evicted. Current txn will have to be restarted...",
+        	    VOLT_DEBUG("Tuple in index scan on %s is evicted. Current txn will have to be restarted...",
                            m_targetTable->name().c_str());
 
-                // Tell the EvictionManager's internal tracker that we touched this mofo
-                eviction_manager->recordEvictedAccess(m_catalogTable, &m_tuple);
-                continue;
+        	    // Tell the EvictionManager's internal tracker that we touched this mofo
+        	    eviction_manager->recordEvictedAccess(m_catalogTable, &m_tuple);
+        	    continue;
 
             // Otherwise, we can form a temporary target_table tuple
             // It is only used for expression evaluation
         	} else {
         		Table *evictedTable = m_targetTable->getEvictedTable();
-            	std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
+        		std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
 
             	// we don't care about the garbage in the column we don't want
-            	int numEvictedColumn = evictedTable->columnCount();
-            	for(int i = 2; i < numEvictedColumn; i++) {
+        		int numEvictedColumn = evictedTable->columnCount();
+        		for(int i = 2; i < numEvictedColumn; i++) {
             		// so m_tuple here is actually an evictedTable tuple
-            		NValue value = m_tuple.getNValue(i);
-            	    tempTuple.setNValue(evictedColumnIndex[i - 2], value);
-            	}
+        			NValue value = m_tuple.getNValue(i);
+        			tempTuple.setNValue(evictedColumnIndex[i - 2], value);
+        		}
             	useTempTuple = true;
         	}
 #else
@@ -587,8 +587,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
 
         	// check end_expression
         	if(end_expression != NULL && end_expression->eval(&tempTuple, NULL).isFalse()) {
-                VOLT_DEBUG("End Expression evaluated to false, stopping scan");
-                break;
+        		VOLT_DEBUG("End Expression evaluated to false, stopping scan");
+        		break;
         	}
 
         	// check post-predicate
@@ -607,8 +607,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
         		if(m_aggregateNode != NULL) {
         			if (aggregate_isset == false ||
         			    m_aggregateCompareValue == VALUE_COMPARE_LESSTHAN ?
-        			    m_tuple.getNValue(m_aggregateColumnIdx).op_lessThan(aggregate_value).isTrue() :
-        			    m_tuple.getNValue(m_aggregateColumnIdx).op_greaterThan(aggregate_value).isTrue())
+        			    tempTuple.getNValue(m_aggregateColumnIdx).op_lessThan(aggregate_value).isTrue() :
+        			    tempTuple.getNValue(m_aggregateColumnIdx).op_greaterThan(aggregate_value).isTrue())
         			{
         				aggregate_value = tempTuple.getNValue(m_aggregateColumnIdx);
 
@@ -650,18 +650,18 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
         } else {
         	// end_expression
         	if(end_expression != NULL && end_expression->eval(&m_tuple, NULL).isFalse()) {
-                VOLT_DEBUG("End Expression evaluated to false, stopping scan");
-                break;
+        		VOLT_DEBUG("End Expression evaluated to false, stopping scan");
+        		break;
         	}
 
         	//post_expression
         	if(post_expression == NULL || post_expression->eval(&m_tuple, NULL).isTrue()) {
 
-				#ifdef ANTICACHE
+			#ifdef ANTICACHE
         		if(hasEvictedTable) {
         			eviction_manager->updateTuple(m_targetTable, &m_tuple, false);
         		}
-				#endif
+			#endif
 
         		//distinct
         		if(m_distinctNode != NULL) {
@@ -673,16 +673,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
 
         		// aggregate
         		if(m_aggregateNode != NULL) {
-                    if (aggregate_isset == false ||
-                        m_aggregateCompareValue == VALUE_COMPARE_LESSTHAN ?
-                        m_tuple.getNValue(m_aggregateColumnIdx).op_lessThan(aggregate_value).isTrue() :
-                        m_tuple.getNValue(m_aggregateColumnIdx).op_greaterThan(aggregate_value).isTrue())
-                    {
-                        aggregate_value = m_tuple.getNValue(m_aggregateColumnIdx);
-                        aggregate_tuple_address = m_tuple.address();
-                        aggregateOnTempTuple = false;
-                        aggregate_isset = true;
-                    }
+        			if (aggregate_isset == false ||
+        				m_aggregateCompareValue == VALUE_COMPARE_LESSTHAN ?
+        				m_tuple.getNValue(m_aggregateColumnIdx).op_lessThan(aggregate_value).isTrue() :
+        				m_tuple.getNValue(m_aggregateColumnIdx).op_greaterThan(aggregate_value).isTrue())
+        			{
+        				aggregate_value = m_tuple.getNValue(m_aggregateColumnIdx);
+        				aggregate_tuple_address = m_tuple.address();
+        				aggregateOnTempTuple = false;
+        				aggregate_isset = true;
+        			}
 
                 // projection
         		} else if(m_projectionNode != NULL) {
@@ -817,6 +817,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
     		Table *evictedTable = m_targetTable->getEvictedTable();
         	std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
 
+        	// first move m_tuple to the address we recorded
+        	m_tuple.move(aggregate_tuple_address);
+
         	// we don't care about the garbage in the column we don't want
         	int numEvictedColumn = evictedTable->columnCount();
         	for(int i = 2; i < numEvictedColumn; i++) {
@@ -855,7 +858,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
             		eviction_manager->updateTuple(m_targetTable, &m_tuple, false);
             	}
             }
-			#endif
+            #endif
 
         // straight insert
     	} else {
@@ -869,7 +872,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
             		eviction_manager->updateTuple(m_targetTable, &m_tuple, false);
             	}
             }
-			#endif
+            #endif
     	}
     }
 #else
