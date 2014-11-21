@@ -62,6 +62,7 @@
 
 #ifdef ANTICACHE
 #include "anticache/AntiCacheEvictionManager.h"
+#include "anticache/EvictedTable.h"
 #endif
 
 using namespace voltdb;
@@ -320,6 +321,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params, ReadWriteTracke
             return false;
         }
 
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+        // use inline_node to focus on inner table
+        bool needAccessAntiCache = inline_node->getAntiCachePredicate() ||
+        		inline_node->getAntiCacheProjection();
+#endif
+
         bool match = false;
         while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
                 !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
@@ -329,10 +336,37 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params, ReadWriteTracke
             match = true;
             inner_table->updateTupleAccessCount();
             
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+            TableTuple &tempTuple = inner_table->tempTuple();
+            bool useTempTuple = false;
+#endif
+
             // Anti-Cache Evicted Tuple Tracking
             #ifdef ANTICACHE
             // We are pointing to an entry for an evicted tuple
             if (hasEvictedTable && inner_tuple.isEvicted()) {
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+            	if(needAccessAntiCache) {
+                    VOLT_INFO("Tuple in NestLoopIndexScan is evicted %s", inner_catalogTable->name().c_str());
+
+                    // Tell the EvictionManager's internal tracker that we touched this mofo
+                    eviction_manager->recordEvictedAccess(inner_catalogTable, &inner_tuple);
+                    continue;
+
+                // otherwise, form a temporary inner_table tuple
+                // it is used for expression evaluation
+            	} else {
+            		Table *evictedTable = inner_table->getEvictedTable();
+            		std::vector<int> evictedColumnIndex = static_cast<EvictedTable*>(evictedTable)->getEvictedColumnIndex();
+
+            		int numEvictedColumn = evictedTable->columnCount();
+            		for(int i = 2; i < numEvictedColumn; i++) {
+            			NValue value = inner_tuple.getNValue(i);
+            			tempTuple.setNValue(evictedColumnIndex[i - 2], value);
+            		}
+            		useTempTuple = true;
+            	}
+#else
                 VOLT_INFO("Tuple in NestLoopIndexScan is evicted %s", inner_catalogTable->name().c_str());      
 
                 // Tell the EvictionManager's internal tracker that we touched this mofo
@@ -343,11 +377,33 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params, ReadWriteTracke
                 // There is nothing else we can do with it (i.e., check expressions).
                 // I don't know why this wasn't here in the first place?
                 continue;
+#endif
             }
             #endif
 
             VOLT_TRACE("inner_tuple:%s",
                        inner_tuple.debug(inner_table->name()).c_str());
+
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+            if(useTempTuple) {
+                //
+                // Append the temp inner tuple values to the end of our join tuple
+                //
+                for (int col_ctr = 0; col_ctr < num_of_inner_cols; ++col_ctr) {
+                    join_tuple.setNValue(col_ctr + num_of_outer_cols,
+                                         tempTuple.getNValue(col_ctr));
+                }
+            } else {
+                //
+            	// Do as normal
+                // Append the inner values to the end of our join tuple
+                //
+                for (int col_ctr = 0; col_ctr < num_of_inner_cols; ++col_ctr) {
+                    join_tuple.setNValue(col_ctr + num_of_outer_cols,
+                                         inner_tuple.getNValue(col_ctr));
+                }
+            }
+#else
             //
             // Append the inner values to the end of our join tuple
             //
@@ -355,6 +411,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params, ReadWriteTracke
                 join_tuple.setNValue(col_ctr + num_of_outer_cols,
                                      inner_tuple.getNValue(col_ctr));
             }
+#endif
             VOLT_TRACE("join_tuple tuple: %s",
                        join_tuple.debug(output_table->name()).c_str());
 
@@ -379,10 +436,24 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params, ReadWriteTracke
                 output_table->insertTupleNonVirtual(join_tuple);
             
                 #ifdef ANTICACHE
+#ifdef ANTICACHE_VERTICAL_PARTITIONING
+                if(hasEvictedTable) {
+                	// if we are using the tempTuple,
+                	// then the inner_tuple is a evicted tuple,
+                	// we don't need to do anything
+                	if(useTempTuple) {
+
+                	} else {
+                        // update the tuple in the LRU eviction chain
+                        eviction_manager->updateTuple(inner_table, &inner_tuple, false);
+                	}
+                }
+#else
                 if (hasEvictedTable) {
                     // update the tuple in the LRU eviction chain
                     eviction_manager->updateTuple(inner_table, &inner_tuple, false);
                 }
+#endif
                 #endif
             }
         } // WHILE
