@@ -271,6 +271,16 @@ public class CatalogAttributeText {
                 String schema = CatalogUtil.toSchema(catalog_tbl);
                 sb.append("\n").append(schema).append("\n");
             }
+            
+            // let's see the evicted columns
+            if(!catalog_tbl.getEvictcolumns().isEmpty()) {
+                sb.append(StringUtil.SINGLE_LINE);
+                sb.append("EvictedColumns: ");
+                Collection<String> evictedColumns = CatalogUtil.getDisplayNames(catalog_tbl.getEvictcolumns());
+                for(String col : evictedColumns) {
+                    sb.append(col + "; ");
+                }
+            }
         }
         // Statement
         else if (catalog_obj instanceof Statement) {

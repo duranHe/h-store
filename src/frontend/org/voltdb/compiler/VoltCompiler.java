@@ -855,6 +855,9 @@ public class VoltCompiler {
                 catalog_tbl.setBatchevicted(true);
             } // FOR
         }
+        
+        VerticalPartitioningCompiler vpCompiler = new VerticalPartitioningCompiler(db);
+        vpCompiler.compileEvictedColumns();
 
         // add vertical partitions
         if (database.getVerticalpartitions() != null) {

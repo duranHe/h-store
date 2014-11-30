@@ -81,7 +81,7 @@ public abstract class AbstractPlanNode implements JSONString, Cloneable, Compara
     // temp use for vertical partitioning
     // should be set based on the SQL query
     protected boolean m_antiCachePredicate = false;
-    protected boolean m_antiCacheProjection = false;
+    protected boolean m_antiCacheProjection = true;
 
     /**
      * Instantiates a new plan node.
