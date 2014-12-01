@@ -304,14 +304,20 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 		evictColumnNames[0] = std::string("BLOCK_ID");
 		evictColumnNames[1] = std::string("TUPLE_OFFSET");
 
+//		std::string tableName = catalogTable.name();
+//		if(tableName.compare("order_line") || tableName.compare("ORDER_LINE")) {
+//			cout << "tableName: " + tableName + ", evict cols: " << numEvictColumns << endl;
+//		}
+
 		map<string, catalog::ColumnRef*>::const_iterator evictColumnIte;
+		int columnIndex = 0;
 		for(evictColumnIte = catalogTable.evictColumns().begin();
 			evictColumnIte != catalogTable.evictColumns().end(); evictColumnIte++)
 		{
 			const catalog::ColumnRef *evict_columnRef = evictColumnIte->second;
 			const catalog::Column *evict_column = evict_columnRef->column();
 
-			const int columnIndex = evict_columnRef->index();
+//			const int columnIndex = evict_columnRef->index();
 			const ValueType type = static_cast<ValueType>(evict_column->type());
 			evictColumnTypes[columnIndex] = type;
 
@@ -322,6 +328,13 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 			evictColumnLengths[columnIndex] = length;
 			evictColumnAllowNull[columnIndex] = evict_column->nullable();
 			evictColumnNames[columnIndex + 2] = evict_column->name();
+
+			columnIndex++;
+
+//			cout << "columnName: " << evict_column->name() << endl;
+//			cout << "columnIndex: " << columnIndex << endl;
+//			cout << "type: " << type << endl;
+//			cout << "size: " << size << endl;
 		}
 
 		TupleSchema *evictedSchema = TupleSchema::createEvictedTupleSchema(evictColumnTypes,
