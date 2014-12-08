@@ -18,6 +18,8 @@
 package org.voltdb.planner;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -28,15 +30,25 @@ import org.hsqldb.HSQLInterface;
 import org.hsqldb.HSQLInterface.HSQLParseException;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.utils.BuildDirectoryUtils;
 
+import edu.brown.catalog.CatalogUtil;
+import edu.brown.hstore.conf.HStoreConf;
 import edu.brown.logging.LoggerUtil.LoggerBoolean;
 
 /**
@@ -355,7 +367,7 @@ public class QueryPlanner {
             plansOut.println(stats.toString());
             plansOut.close();
         }
-
+        
         // PAVLO: Get the full plan json
         AbstractPlanNode root = bestPlan.fragments.get(0).planGraph;
 //        String orig_debug = PlanNodeUtil.debug(root);
@@ -409,4 +421,5 @@ public class QueryPlanner {
     public String getErrorMessage() {
         return m_recentErrorMsg;
     }
+    
 }

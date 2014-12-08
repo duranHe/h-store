@@ -18,8 +18,11 @@
 package org.voltdb.compiler;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
@@ -27,7 +30,9 @@ import org.hsqldb.HSQLInterface;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
@@ -38,14 +43,19 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PlanColumn;
+import org.voltdb.planner.PlannerContext;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.Encoder;
@@ -295,6 +305,17 @@ public abstract class StatementCompiler {
 
                 String json = null;
                 try {
+                    
+                    // Yuning: before serializing plan to JSON obj,
+                    // set up the AntiCachePredicate and AntiCacheProject
+                    Collection<AbstractPlanNode> nodes = new ArrayList<AbstractPlanNode>();
+                    getLeafNode(node_list.getRootPlanNode(), nodes);
+                    for(AbstractPlanNode n : nodes) {
+                        setAntiCachePredicate(n, catalogStmt);
+                        setAntiCacheProjection(n, catalogStmt);
+                    }
+                    
+                    
                     JSONObject jobj = new JSONObject(node_list.toJSONString());
                     json = jobj.toString(4);
                 } catch (JSONException e2) {
@@ -439,5 +460,154 @@ public abstract class StatementCompiler {
 
         // if nothing found, return true
         return true;
+    }
+    
+    /**
+     * Recursively get all the nodes that are SeqScan, IndexScan and NestLoopIndex
+     * @param root
+     * @param nodes
+     */
+    private static void getLeafNode(AbstractPlanNode root, Collection<AbstractPlanNode> nodes) {
+        if(root == null) {
+            return;
+        }
+        
+        if(root instanceof SeqScanPlanNode ||
+                root instanceof IndexScanPlanNode ||
+                root instanceof NestLoopIndexPlanNode) {
+            nodes.add(root);
+        } 
+        
+        for(int i = 0; i < root.getChildPlanNodeCount(); i++) {
+            getLeafNode(root.getChild(i), nodes);
+        }
+    }
+    
+    /**
+     * Check if a stmt's predicate needs AntiCacheColumns.
+     * Set the parameter in plannode accordingly
+     * @param node
+     * @param stmt
+     */
+    private static void setAntiCachePredicate(AbstractPlanNode node, Statement stmt) {
+        Collection<Table> refTables = CatalogUtil.getReferencedTables(stmt);
+        Collection<Column> refColumns = CatalogUtil.getReferencedColumns(stmt);
+        
+        // for each referenced table
+        for(Table table : refTables) {
+//            System.out.println("Ref Table: " + table.getName());
+            CatalogMap<Column> columns = table.getColumns();
+            CatalogMap<ColumnRef> evictedColumns = table.getEvictcolumns();
+            
+            // for each referenced predicate column
+            for(Column col : refColumns) {
+                
+                // if this column belongs to the referenced table
+                if(columns.contains(col)) {
+                    // check if this column is kept in EvcitedTable
+                    boolean match = false;
+                    Iterator<ColumnRef> ite = evictedColumns.iterator();
+                    while(ite.hasNext()) {
+                        Column evictedCol = ite.next().getColumn();
+                        if(evictedCol.getName().equalsIgnoreCase(col.getName())) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    
+                    // if there is a referenced column that is not in the evictedColumn list
+                    // it means ee needs to access AntiCache to evaluate the predicate
+                    if(!match) {
+                        node.setAntiCachePredicate(true);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        node.setAntiCachePredicate(false);
+    }
+    
+    /**
+     * Check if a stmt's projection needs AntiCacheColumns
+     * Set parameter in plannode accordingly
+     * @param node
+     * @param stmt
+     */
+    public static void setAntiCacheProjection(AbstractPlanNode node, Statement stmt) {
+        Collection<Table> refTables = CatalogUtil.getReferencedTables(stmt);
+        Collection<PlanColumn> outputColumns = getOutputColumns(node);
+        
+        // for each referenced table
+        for(Table table : refTables) {
+            CatalogMap<ColumnRef> evictedColumns = table.getEvictcolumns();
+           
+            // for each output column
+            for(PlanColumn col : outputColumns) {
+                
+                // First we want to make sure this outputCol belongs to this table
+                if(belongTo(col, table)) {
+                    boolean match = false;
+                    Iterator<ColumnRef> ite = evictedColumns.iterator();
+                    while(ite.hasNext()) {
+                        Column evictedCol = ite.next().getColumn();
+                        if(evictedCol.getName().equalsIgnoreCase(col.originColumnName())) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    
+                    if(!match) {
+                        node.setAntiCacheProjection(true);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        node.setAntiCacheProjection(false);
+    }
+    
+    private static boolean belongTo(PlanColumn column, Table table) {
+        Iterator<Column> ite = table.getColumns().iterator();
+        while(ite.hasNext()) {
+            Column col = ite.next();
+            if(col.getName().equalsIgnoreCase(column.originColumnName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    private static Collection<PlanColumn> getOutputColumns(AbstractPlanNode root) {
+        Collection<PlanColumn> outputColumns = new ArrayList<PlanColumn>();
+        AbstractPlanNode inlineProjection = root.getInlinePlanNode(PlanNodeType.PROJECTION);
+        List<Integer> outputColGuid;
+        
+        if(inlineProjection == null) {
+            outputColGuid = root.getOutputColumnGUIDs();
+        } else {
+            outputColGuid = inlineProjection.getOutputColumnGUIDs();
+        }
+        
+        for(int c : outputColGuid) {
+            PlanColumn col = PlannerContext.singleton().get(c);
+            outputColumns.add(col);
+        }
+        
+        return outputColumns;
+    }
+    
+    /**
+     * For debug purporse. Print out the reference tables for a stmt
+     * @param stmt
+     */
+    public static void printReferencedTable(Statement stmt) {
+        System.out.println("Refer table: ");
+        Collection<Table> tables = CatalogUtil.getReferencedTables(stmt);
+        for(Table t : tables) {
+            System.out.print(t.getName() + "; ");
+        }
+        System.out.println();
     }
 }

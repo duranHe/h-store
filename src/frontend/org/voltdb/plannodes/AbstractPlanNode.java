@@ -532,6 +532,14 @@ public abstract class AbstractPlanNode implements JSONString, Cloneable, Compara
     public Boolean antiCacheProjection() {
         return m_antiCacheProjection;
     }
+    
+    public void setAntiCachePredicate(boolean flag) {
+        m_antiCachePredicate = flag;
+    }
+    
+    public void setAntiCacheProjection(boolean flag) {
+        m_antiCacheProjection = flag;
+    }
 
 
     /**

@@ -855,9 +855,6 @@ public class VoltCompiler {
                 catalog_tbl.setBatchevicted(true);
             } // FOR
         }
-        
-        VerticalPartitioningCompiler vpCompiler = new VerticalPartitioningCompiler(db);
-        vpCompiler.compileEvictedColumns();
 
         // add vertical partitions
         if (database.getVerticalpartitions() != null) {
@@ -901,6 +898,10 @@ public class VoltCompiler {
         for (final Class<?> classDependency : classDependencies) {
             addClassToJar( classDependency, this );
         }
+        
+        // Yuning: for vertical partitioning in AntiCache
+        VerticalPartitioningCompiler.setup(db);
+        VerticalPartitioningCompiler.compileEvictedColumns();
 
         m_hsql.close();
     }
