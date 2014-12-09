@@ -59,7 +59,7 @@ public final class TPCCConfig {
      * Scale the number of items based on the client scalefactor.
      * @see HStoreConf.ClientConf.scalefactor
      */
-    public boolean scale_items = false;
+    public boolean scale_items = true;
     
     private TPCCConfig() {
         // Nothing

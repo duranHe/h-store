@@ -36,7 +36,6 @@ public class VerticalPartitioningCompiler {
             
             // only set up evicted columns for EvictedTable
             if(table.getEvictable()) {
-                System.out.println("Evictable: " + table.getName());
                 HashMap<Column, Integer> counter = new HashMap<Column, Integer>();
                 Iterator<Column> columnIte = table.getColumns().iterator();
                 while(columnIte.hasNext()) {
@@ -89,12 +88,15 @@ public class VerticalPartitioningCompiler {
         for(Table table : columnCounter.keySet()) {
             ArrayList<Column> topCol = sortMap(columnCounter.get(table));
             CatalogMap<ColumnRef> evictedColumns = table.getEvictcolumns();
+            System.out.println("Evictable: " + table.getName());
             
             for(Column col : topCol) {
                 String colName = col.getName();
                 ColumnRef colRef = evictedColumns.add(colName);
                 colRef.setColumn(col);
+                System.out.print(col.getName() + "; ");
             }
+            System.out.println();
         }
     }
     
