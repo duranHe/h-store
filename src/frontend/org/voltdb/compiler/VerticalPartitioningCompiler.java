@@ -18,6 +18,14 @@ public class VerticalPartitioningCompiler {
     static Database m_db = null;
     static HashMap<Table, HashMap<Column, Integer>> columnCounter;
     static int evictedColumnCount = 2; // FIX ME
+    static double evictedColumnPercentage = 0.3; // FIX ME
+    
+    /*
+     *  0: num of column
+     *  1: percentage of column
+     *  2: based on workload (hardcode)
+     */
+    static int evictedColumnModel = 0;
     
     public static void setup(Database db) {
         m_db = db;
@@ -49,9 +57,9 @@ public class VerticalPartitioningCompiler {
     }
     
     /**
+     * Workload based evictedColumn selection.
      * Hard code for now.
      * Only for tpcc benchmark.
-     * Evicted columns: HISTORY: H_D_ID, H_W_ID
      */
     public static void hardcode() {
         CatalogMap<Table> tableList = m_db.getTables();
@@ -100,6 +108,11 @@ public class VerticalPartitioningCompiler {
         }
     }
     
+    /**
+     * Sort the columns by "hotness"
+     * @param counter
+     * @return only the requested top-n columns
+     */
     private static ArrayList<Column> sortMap(HashMap<Column, Integer> counter) {
         List<Map.Entry<Column, Integer>> list = 
                 new ArrayList<Map.Entry<Column, Integer>>(counter.entrySet());
@@ -113,14 +126,25 @@ public class VerticalPartitioningCompiler {
             }
         });
         
+        int topN = 0;
+        if(evictedColumnModel == 0) {
+        	topN = evictedColumnCount;
+        } else if(evictedColumnModel == 1) {
+        	topN = (int) (counter.size() * evictedColumnPercentage);
+        } else {
+        	// shouldn't be here
+        }
+        
         ArrayList<Column> top = new ArrayList<Column>();
-        for(int i = 0; i < list.size() && i < evictedColumnCount; i++) {
+        for(int i = 0; i < list.size() && i < topN; i++) {
             Column col = list.get(i).getKey();
             int count = list.get(i).getValue();
             
             if(count != 0){
                 top.add(col);
             } else {
+            	// already a cold column
+            	// stop even though we don't get the topN columns
                 break;
             }
         }

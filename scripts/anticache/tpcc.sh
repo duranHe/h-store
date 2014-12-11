@@ -23,8 +23,8 @@ CLIENT_HOSTS=( \
 )
 
 BASE_CLIENT_THREADS=1
-BASE_SITE_MEMORY=512
-BASE_SITE_MEMORY_PER_PARTITION=64
+BASE_SITE_MEMORY=8192
+BASE_SITE_MEMORY_PER_PARTITION=1024
 BASE_PROJECT="tpcc"
 BASE_DIR=`pwd`
 OUTPUT_DIR="~/data/ycsb/read-heavy/2/80-20"
@@ -64,10 +64,10 @@ BASE_ARGS=( \
 #    "-Dsite.queue_threshold_factor=0.5" \
 
     # Client Params
-    "-Dclient.scalefactor=0.001" \
-    "-Dclient.memory=128" \
+    "-Dclient.scalefactor=0.1" \
+    "-Dclient.memory=2048" \
     "-Dclient.txnrate=50" \
-    "-Dclient.warmup=5000" \
+    "-Dclient.warmup=10000" \
     "-Dclient.duration=30000" \
     "-Dclient.shared_connection=false" \
     "-Dclient.blocking=false" \
