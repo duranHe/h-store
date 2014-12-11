@@ -67,30 +67,48 @@ public class VerticalPartitioningCompiler {
         
         while(tableIte.hasNext()) {
             Table table = tableIte.next();
+            
             if(table.getName().equalsIgnoreCase("ORDER_LINE")) {
                 table.setEvictable(true);
                 CatalogMap<ColumnRef> evictedColumn = table.getEvictcolumns();
                 
-                String[] evictedColumnName = {"OL_NUMBER", "OL_W_ID"};
+                String[] evictedColumnName = {"OL_O_ID", "OL_W_ID", "OL_D_ID", 
+                		"OL_I_ID", "OL_SUPPLY_W_ID", "OL_AMOUNT", "OL_QUANTITY", "OL_DELIVERY"};
                 
                 for(int i = 0; i < evictedColumnName.length; i++){
                     String colName = evictedColumnName[i];
                     ColumnRef colRef = evictedColumn.add(colName);
                     colRef.setColumn(table.getColumns().get(colName));
-                    System.out.println("type name: " + colRef.getTypeName());   
-                    System.out.println("ColumnRef index: " + colRef.getIndex());
-                    System.out.println("Column index: " + colRef.getColumn().getIndex());
-                    System.out.println("column type: " + colRef.getColumn().getType());
+                }
+            }
+            
+            if(table.getName().equalsIgnoreCase("ORDERS")) {
+                table.setEvictable(true);
+                CatalogMap<ColumnRef> evictedColumn = table.getEvictcolumns();
+                
+                String[] evictedColumnName = {"O_ID", "O_CARRIER_ID", "O_ENTRY_D", "O_W_ID",
+                		"O_D_ID", "O_C_ID"};
+                
+                for(int i = 0; i < evictedColumnName.length; i++){
+                    String colName = evictedColumnName[i];
+                    ColumnRef colRef = evictedColumn.add(colName);
+                    colRef.setColumn(table.getColumns().get(colName));
                 }
             }
         }
     }
     
     public static void compileEvictedColumns() {
+    	if(evictedColumnModel == 2) {
+    		hardcode();
+    		return;
+    	}
+    	
         if(columnCounter.size() == 0) {
             return;
         }
         
+        // else: calculate column hotness
         columnRefCount();
         
         for(Table table : columnCounter.keySet()) {
